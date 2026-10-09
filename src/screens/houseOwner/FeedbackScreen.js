@@ -1,10 +1,55 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../../config/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export default function FeedbackScreen({ navigation }) {
     const [rating, setRating] = useState(0);
+    const [feedback, setFeedback] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
+    const handleSubmit = async () => {
+        setLoading(true);
+        try {
+            // Write feedback to Firestore
+            const userId = auth.currentUser?.uid || 'anonymous';
+            await addDoc(collection(db, 'feedback'), {
+                userId,
+                rating,
+                comment: feedback,
+                workerName: 'Anura Silva', // Static for now based on mockup
+                createdAt: new Date(),
+            });
+
+            setLoading(false);
+            setIsSubmitted(true); // Switch to success UI
+
+            // Wait 2 seconds so they can see the success message, then redirect
+            setTimeout(() => {
+                navigation.navigate('HomeScreen');
+            }, 2000);
+
+        } catch (error) {
+            setLoading(false);
+            Alert.alert("Error", error.message);
+        }
+    };
+
+    // If the submission was successful, render this Success View instead!
+    if (isSubmitted) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.successContainer}>
+                    <Ionicons name="checkmark-circle" size={100} color="#10B981" />
+                    <Text style={styles.successText}>Feedback submitted</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // Default Form View
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
@@ -26,13 +71,15 @@ export default function FeedbackScreen({ navigation }) {
                     placeholderTextColor="#A0A0A0"
                     multiline
                     textAlignVertical="top"
+                    value={feedback}
+                    onChangeText={setFeedback}
                 />
 
-                <TouchableOpacity style={styles.submitButton} onPress={() => navigation.navigate('HomeScreen')}>
-                    <Text style={styles.submitButtonText}>Submit Feedback</Text>
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>Submit Feedback</Text>}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.skipButton} onPress={() => navigation.navigate('HomeScreen')}>
+                <TouchableOpacity style={styles.skipButton} onPress={() => navigation.navigate('HomeScreen')} disabled={loading}>
                     <Text style={styles.skipButtonText}>Skip for now</Text>
                 </TouchableOpacity>
             </View>
@@ -43,6 +90,12 @@ export default function FeedbackScreen({ navigation }) {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FAFBFF' },
     container: { flex: 1, paddingHorizontal: 20, justifyContent: 'center' },
+
+    // Success View Styles
+    successContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    successText: { fontSize: 24, fontWeight: 'bold', color: '#1E2022', marginTop: 15 },
+
+    // Form Styles
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E2022', textAlign: 'center', marginBottom: 10 },
     subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 30 },
 
@@ -55,3 +108,4 @@ const styles = StyleSheet.create({
     skipButton: { paddingVertical: 15, alignItems: 'center' },
     skipButtonText: { color: '#888', fontSize: 16, fontWeight: 'bold' },
 });
+
