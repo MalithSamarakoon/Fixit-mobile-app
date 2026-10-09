@@ -130,7 +130,7 @@ export default function TaskDescriptionScreen({ navigation }) {
                 ))}
 
                 {/* Calculate Cost Button */}
-                <TouchableOpacity style={styles.calculateButton}>
+                <TouchableOpacity style={styles.calculateButton} onPress={() => navigation.navigate('EstimatedCost')}>
                     <Text style={styles.calculateButtonText}>Calculate Cost</Text>
                 </TouchableOpacity>
 

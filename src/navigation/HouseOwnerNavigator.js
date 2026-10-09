@@ -7,6 +7,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import HomeScreen from '../screens/houseOwner/HomeScreen';
 import WorkerProfileScreen from '../screens/houseOwner/WorkerProfileScreen';
 import TaskDescriptionScreen from '../screens/houseOwner/TaskDescriptionScreen';
+import EstimatedCostScreen from '../screens/houseOwner/EstimatedCostScreen';
+import WorkerTrackingScreen from '../screens/houseOwner/WorkerTrackingScreen';
+import FeedbackScreen from '../screens/houseOwner/FeedbackScreen';
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -18,6 +22,10 @@ function HomeStack() {
             <Stack.Screen name="HomeScreen" component={HomeScreen} />
             <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} />
             <Stack.Screen name="TaskDescription" component={TaskDescriptionScreen} />
+
+            <Stack.Screen name="EstimatedCost" component={EstimatedCostScreen} />
+            <Stack.Screen name="WorkerTracking" component={WorkerTrackingScreen} />
+            <Stack.Screen name="Feedback" component={FeedbackScreen} />
         </Stack.Navigator>
     );
 }
