@@ -36,7 +36,7 @@ export default function HomeScreen({ navigation }) {
 
             {/* Top Cards (Agencies & Hardware) */}
             <View style={styles.cardsRow}>
-                <TouchableOpacity style={styles.topCard}>
+                <TouchableOpacity style={styles.topCard} onPress={() => navigation.navigate('FindAgencies')}>
                     <View style={[styles.iconWrapper, { backgroundColor: '#F0F4FF' }]}>
                         <Ionicons name="business" size={24} color="#3B66FE" />
                     </View>

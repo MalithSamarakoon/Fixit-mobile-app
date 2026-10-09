@@ -10,6 +10,10 @@ import TaskDescriptionScreen from '../screens/houseOwner/TaskDescriptionScreen';
 import EstimatedCostScreen from '../screens/houseOwner/EstimatedCostScreen';
 import WorkerTrackingScreen from '../screens/houseOwner/WorkerTrackingScreen';
 import FeedbackScreen from '../screens/houseOwner/FeedbackScreen';
+import BookingsScreen from '../screens/houseOwner/BookingsScreen';
+import FindAgenciesScreen from '../screens/houseOwner/FindAgenciesScreen';
+import AgencyBookingFormScreen from '../screens/houseOwner/AgencyBookingFormScreen';
+
 
 
 const Tab = createBottomTabNavigator();
@@ -26,6 +30,9 @@ function HomeStack() {
             <Stack.Screen name="EstimatedCost" component={EstimatedCostScreen} />
             <Stack.Screen name="WorkerTracking" component={WorkerTrackingScreen} />
             <Stack.Screen name="Feedback" component={FeedbackScreen} />
+            <Stack.Screen name="FindAgencies" component={FindAgenciesScreen} />
+            <Stack.Screen name="AgencyBookingForm" component={AgencyBookingFormScreen} />
+
         </Stack.Navigator>
     );
 }
@@ -54,7 +61,7 @@ export default function HouseOwnerNavigator() {
         })}>
             {/* 2. We use the HomeStack here instead of a simple screen */}
             <Tab.Screen name="Home" component={HomeStack} />
-            <Tab.Screen name="Bookings" component={DummyScreen} />
+            <Tab.Screen name="Bookings" component={BookingsScreen} />
             <Tab.Screen name="Workers" component={DummyScreen} />
             <Tab.Screen name="Profile" component={DummyScreen} />
         </Tab.Navigator>
