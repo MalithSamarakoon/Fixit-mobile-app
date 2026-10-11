@@ -10,6 +10,7 @@ import WorkersScreen from '../screens/serviceAgency/WorkersScreen';
 import AddWorkerScreen from '../screens/serviceAgency/AddWorkerScreen';
 import NewJobAssignmentScreen from '../screens/serviceAgency/NewJobAssignmentScreen';
 import BookingsScreen from '../screens/serviceAgency/BookingsScreen'; // NEW
+import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -61,7 +62,7 @@ export default function ServiceAgencyNavigator() {
             <Tab.Screen name="Home" component={HomeStack} />
             <Tab.Screen name="Bookings" component={BookingsScreen} />
             <Tab.Screen name="Workers" component={WorkersStack} />
-            <Tab.Screen name="Profile" component={DummyScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }

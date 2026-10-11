@@ -11,6 +11,7 @@ import EditProductScreen from '../screens/hardwareShop/EditProductScreen';
 import OrdersScreen from '../screens/hardwareShop/OrdersScreen';
 import OrderDetailsScreen from '../screens/hardwareShop/OrderDetailsScreen';
 import AdsPromosScreen from '../screens/hardwareShop/AdsPromosScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -60,7 +61,7 @@ export default function HardwareShopNavigator() {
             <Tab.Screen name="Products" component={ProductsStack} />
             <Tab.Screen name="Orders" component={OrdersStack} />
             <Tab.Screen name="Ads" component={AdsPromosScreen} />
-            <Tab.Screen name="Profile" component={DummyScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }

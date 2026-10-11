@@ -9,6 +9,7 @@ import JobRequestsScreen from '../screens/tradeWorker/JobRequestsScreen';
 import JobDetailsScreen from '../screens/tradeWorker/JobDetailsScreen';
 import CalendarScreen from '../screens/tradeWorker/CalendarScreen';
 import EarningsScreen from '../screens/tradeWorker/EarningsScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -62,7 +63,7 @@ export default function TradeWorkerNavigator() {
             <Tab.Screen name="Dashboard" component={HomeStack} />
             <Tab.Screen name="Requests" component={JobsStack} />
             <Tab.Screen name="Schedule" component={CalendarScreen} />
-            <Tab.Screen name="Profile" component={DummyScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }

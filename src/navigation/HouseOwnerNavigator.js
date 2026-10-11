@@ -15,6 +15,7 @@ import FindAgenciesScreen from '../screens/houseOwner/FindAgenciesScreen';
 import AgencyBookingFormScreen from '../screens/houseOwner/AgencyBookingFormScreen';
 
 
+import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -63,7 +64,7 @@ export default function HouseOwnerNavigator() {
             <Tab.Screen name="Home" component={HomeStack} />
             <Tab.Screen name="Bookings" component={BookingsScreen} />
             <Tab.Screen name="Workers" component={DummyScreen} />
-            <Tab.Screen name="Profile" component={DummyScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }
