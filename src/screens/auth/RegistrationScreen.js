@@ -25,10 +25,12 @@ export default function RegistrationScreen({ route, navigation }) {
 
     // Custom Validation Function
     const validateInputs = () => {
+        console.log("Validating inputs:", { email, mobile, password, confirmPassword });
         // Regex rules
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const phoneRegex = /^\d{10}$/; // Exactly 10 digits
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
 
         if (!emailRegex.test(email)) {
             Alert.alert("Invalid Email", "Please enter a valid email address.");
@@ -50,11 +52,14 @@ export default function RegistrationScreen({ route, navigation }) {
     };
 
     const handleRegister = async () => {
+        console.log("=== Register button clicked! ===");
         if (!validateInputs()) return; // Stop if validations fail
 
         try {
+            console.log("Attempting Firebase createUserWithEmailAndPassword...");
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const uid = userCredential.user.uid;
+            console.log("Firebase user created with UID:", uid);
 
             let userData = {
                 uid,
@@ -72,12 +77,15 @@ export default function RegistrationScreen({ route, navigation }) {
                 userData.experience = experience;
                 userData.serviceCharges = serviceCharges;
             }
+            console.log("Saving user profile to Firestore users collection...");
 
             await setDoc(doc(db, 'users', uid), userData);
+            console.log("User successfully saved to Firestore!");
 
             Alert.alert("Success", "Account created successfully!");
             navigation.navigate('Login');
         } catch (error) {
+            console.error("Registration error encountered:", error);
             Alert.alert("Registration Error", error.message);
         }
     };
