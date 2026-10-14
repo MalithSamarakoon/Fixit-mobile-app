@@ -4,7 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../config/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
-export default function FeedbackScreen({ navigation }) {
+export default function FeedbackScreen({ navigation, route }) {
+    const worker = route?.params?.worker || {};
+    const workerName = worker.name || worker.username || worker.fullName || 'Anura Silva';
+
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [loading, setLoading] = useState(false);
@@ -17,9 +20,10 @@ export default function FeedbackScreen({ navigation }) {
             const userId = auth.currentUser?.uid || 'anonymous';
             await addDoc(collection(db, 'feedback'), {
                 userId,
+                workerId: worker?.id || null,
+                workerName: workerName,
                 rating,
                 comment: feedback,
-                workerName: 'Anura Silva', // Static for now based on mockup
                 createdAt: new Date(),
             });
 
@@ -28,7 +32,7 @@ export default function FeedbackScreen({ navigation }) {
 
             // Wait 2 seconds so they can see the success message, then redirect
             setTimeout(() => {
-                navigation.navigate('HomeScreen');
+                navigation.navigate('Home', { screen: 'HomeScreen' });
             }, 2000);
 
         } catch (error) {
@@ -55,7 +59,7 @@ export default function FeedbackScreen({ navigation }) {
             <View style={styles.container}>
                 <Ionicons name="checkmark-circle" size={80} color="#10B981" style={{ alignSelf: 'center', marginBottom: 20 }} />
                 <Text style={styles.title}>Job Completed!</Text>
-                <Text style={styles.subtitle}>Rate your experience with Anura Silva</Text>
+                <Text style={styles.subtitle}>Rate your experience with {workerName}</Text>
 
                 <View style={styles.starsRow}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -79,7 +83,7 @@ export default function FeedbackScreen({ navigation }) {
                     {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>Submit Feedback</Text>}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.skipButton} onPress={() => navigation.navigate('HomeScreen')} disabled={loading}>
+                <TouchableOpacity style={styles.skipButton} onPress={() => navigation.navigate('Home', { screen: 'HomeScreen' })} disabled={loading}>
                     <Text style={styles.skipButtonText}>Skip for now</Text>
                 </TouchableOpacity>
             </View>

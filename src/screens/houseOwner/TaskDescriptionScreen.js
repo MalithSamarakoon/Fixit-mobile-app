@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, Switch, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
-export default function TaskDescriptionScreen({ navigation }) {
+export default function TaskDescriptionScreen({ navigation, route }) {
+    const worker = route?.params?.worker;
     const [taskDescription, setTaskDescription] = useState('');
     const [shareLocation, setShareLocation] = useState(true);
+    const [selectedImage, setSelectedImage] = useState(null);
 
     // Dynamic lists for Phone and Hardware
     const [phoneNumbers, setPhoneNumbers] = useState(['+94 77 123 4567']);
@@ -29,6 +32,29 @@ export default function TaskDescriptionScreen({ navigation }) {
         const newItems = [...hardwareItems];
         newItems[index].qty = text;
         setHardwareItems(newItems);
+    };
+
+    // Pick image from media library
+    const pickImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Please grant photo library access to upload task images.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setSelectedImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            Alert.alert('Error', error.message || 'Failed to pick image.');
+        }
     };
 
     return (
@@ -68,11 +94,24 @@ export default function TaskDescriptionScreen({ navigation }) {
                 </View>
 
                 {/* Upload Images Section */}
-                <TouchableOpacity style={styles.uploadBox}>
-                    <Ionicons name="cloud-upload-outline" size={32} color="#2C64E3" style={{ marginBottom: 5 }} />
-                    <Text style={styles.uploadTitle}>Upload images</Text>
-                    <Text style={styles.uploadSub}>JPG, PNG up to 10MB</Text>
-                </TouchableOpacity>
+                {selectedImage ? (
+                    <View style={styles.imagePreviewContainer}>
+                        <Image source={{ uri: selectedImage }} style={styles.previewImage} resizeMode="cover" />
+                        <TouchableOpacity style={styles.removeImageBtn} onPress={() => setSelectedImage(null)}>
+                            <Ionicons name="close-circle" size={26} color="#FF4D4D" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.changeImageBtn} onPress={pickImage}>
+                            <Ionicons name="camera-outline" size={16} color="#fff" style={{ marginRight: 4 }} />
+                            <Text style={styles.changeImageText}>Change</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+                        <Ionicons name="cloud-upload-outline" size={32} color="#2C64E3" style={{ marginBottom: 5 }} />
+                        <Text style={styles.uploadTitle}>Upload images</Text>
+                        <Text style={styles.uploadSub}>JPG, PNG up to 10MB</Text>
+                    </TouchableOpacity>
+                )}
 
                 {/* Phone Numbers Section */}
                 <Text style={styles.label}>Add phone numbers</Text>
@@ -130,7 +169,17 @@ export default function TaskDescriptionScreen({ navigation }) {
                 ))}
 
                 {/* Calculate Cost Button */}
-                <TouchableOpacity style={styles.calculateButton} onPress={() => navigation.navigate('EstimatedCost')}>
+                <TouchableOpacity 
+                    style={styles.calculateButton} 
+                    onPress={() => navigation.navigate('EstimatedCost', {
+                        worker,
+                        taskDescription,
+                        shareLocation,
+                        selectedImage,
+                        phoneNumbers: phoneNumbers.filter(p => p.trim() !== ''),
+                        hardwareItems: hardwareItems.filter(h => h.item.trim() !== '')
+                    })}
+                >
                     <Text style={styles.calculateButtonText}>Calculate Cost</Text>
                 </TouchableOpacity>
 
@@ -157,6 +206,41 @@ const styles = StyleSheet.create({
     uploadBox: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 25 },
     uploadTitle: { color: '#2C64E3', fontSize: 14, fontWeight: 'bold', marginBottom: 3 },
     uploadSub: { color: '#A0A0A0', fontSize: 12 },
+
+    imagePreviewContainer: { 
+        height: 160, 
+        borderRadius: 16, 
+        overflow: 'hidden', 
+        marginBottom: 25, 
+        position: 'relative', 
+        borderWidth: 1, 
+        borderColor: '#E5E7EB', 
+        backgroundColor: '#fff' 
+    },
+    previewImage: { width: '100%', height: '100%' },
+    removeImageBtn: { 
+        position: 'absolute', 
+        top: 8, 
+        right: 8, 
+        backgroundColor: '#fff', 
+        borderRadius: 13, 
+        elevation: 2, 
+        shadowColor: '#000', 
+        shadowOpacity: 0.15, 
+        shadowRadius: 3 
+    },
+    changeImageBtn: { 
+        position: 'absolute', 
+        bottom: 8, 
+        right: 8, 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        backgroundColor: 'rgba(0, 0, 0, 0.7)', 
+        paddingHorizontal: 12, 
+        paddingVertical: 6, 
+        borderRadius: 20 
+    },
+    changeImageText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
 
     inputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
     inputBase: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2C64E3', height: 45, borderRadius: 25, paddingHorizontal: 15, fontSize: 14 },

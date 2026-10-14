@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function HomeScreen({ navigation }) {
     const [workerData, setWorkerData] = useState(null);
@@ -15,7 +15,11 @@ export default function HomeScreen({ navigation }) {
                 const uid = auth.currentUser?.uid;
                 if (!uid) return;
                 const userDoc = await getDoc(doc(db, 'users', uid));
-                if (userDoc.exists()) setWorkerData(userDoc.data());
+                if (userDoc.exists()) {
+                    const data = userDoc.data();
+                    setWorkerData(data);
+                    setIsOnline((data.status || 'Available') !== 'Not on duty');
+                }
             } catch (error) {
                 console.error("Error fetching worker data:", error);
             } finally {
@@ -24,6 +28,19 @@ export default function HomeScreen({ navigation }) {
         };
         fetchWorkerData();
     }, []);
+
+    const handleToggleAvailability = async (val) => {
+        setIsOnline(val);
+        const newStatus = val ? 'Available' : 'Not on duty';
+        try {
+            const uid = auth.currentUser?.uid;
+            if (uid) {
+                await updateDoc(doc(db, 'users', uid), { status: newStatus });
+            }
+        } catch (error) {
+            console.error("Error updating status:", error);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -60,15 +77,15 @@ export default function HomeScreen({ navigation }) {
                             </View>
                             <View style={styles.availabilityRow}>
                                 <View style={styles.availTextRow}>
-                                    <View style={styles.availDot} />
+                                    <View style={[styles.availDot, { backgroundColor: isOnline ? '#10B981' : '#EF4444' }]} />
                                     <View>
                                         <Text style={styles.availTitle}>Work Availability</Text>
-                                        <Text style={styles.availSub}>Available for new jobs</Text>
+                                        <Text style={styles.availSub}>{isOnline ? 'Available for new jobs' : 'Not on duty'}</Text>
                                     </View>
                                 </View>
                                 <Switch
                                     value={isOnline}
-                                    onValueChange={setIsOnline}
+                                    onValueChange={handleToggleAvailability}
                                     trackColor={{ false: "#E5E7EB", true: "#4A7DF0" }}
                                     thumbColor={"#fff"}
                                 />

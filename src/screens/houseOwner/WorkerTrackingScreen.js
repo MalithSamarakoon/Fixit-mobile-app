@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function WorkerTrackingScreen({ navigation }) {
+export default function WorkerTrackingScreen({ navigation, route }) {
+    const worker = route?.params?.worker || {};
+    const workerName = worker.name || worker.username || worker.fullName || 'Anura Silva';
+    const workerTrade = worker.trade || worker.serviceType || 'Professional Electrician';
+    const workerExp = worker.experience ? `${worker.experience} Yrs Exp` : '8 Yrs Exp';
+
     const [progress, setProgress] = useState(0);
 
     // Simulate 5-second progress bar
@@ -11,7 +16,7 @@ export default function WorkerTrackingScreen({ navigation }) {
             setProgress(prev => {
                 if (prev >= 3) {
                     clearInterval(interval);
-                    navigation.navigate('Feedback'); // Auto-redirect when done
+                    navigation.navigate('Feedback', { worker }); // Auto-redirect when done
                     return 3;
                 }
                 return prev + 1;
@@ -19,12 +24,12 @@ export default function WorkerTrackingScreen({ navigation }) {
         }, 1250); // 1.25s * 4 steps = ~5 seconds
 
         return () => clearInterval(interval);
-    }, [navigation]);
+    }, [navigation, worker]);
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.navigate('HomeScreen')} style={styles.headerIconButton}>
+                <TouchableOpacity onPress={() => navigation.navigate('Home', { screen: 'HomeScreen' })} style={styles.headerIconButton}>
                     <Ionicons name="close" size={20} color="#1E2022" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Worker Tracking</Text>
@@ -45,12 +50,12 @@ export default function WorkerTrackingScreen({ navigation }) {
                     </View>
                     <View style={styles.workerInfo}>
                         <View style={styles.workerHeaderRow}>
-                            <Text style={styles.workerName}>Anura Silva</Text>
+                            <Text style={styles.workerName}>{workerName}</Text>
                             <View style={styles.statusPill}>
                                 <Text style={styles.statusText}>● On the way</Text>
                             </View>
                         </View>
-                        <Text style={styles.workerSub}>Professional Electrician • 8 Yrs Exp</Text>
+                        <Text style={styles.workerSub}>{workerTrade} • {workerExp}</Text>
                     </View>
                     <View style={styles.etaBox}>
                         <Text style={styles.etaTime}>12 min</Text>
@@ -67,7 +72,7 @@ export default function WorkerTrackingScreen({ navigation }) {
                     </View>
                     <View style={styles.progressTextRow}>
                         <Ionicons name="time-outline" size={18} color="#2C64E3" />
-                        <Text style={styles.progressText}>Anura Silva is on the way to destination...</Text>
+                        <Text style={styles.progressText}>{workerName} is on the way to destination...</Text>
                     </View>
                 </View>
             </View>
