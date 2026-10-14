@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../config/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
-export default function EstimatedCostScreen({ navigation }) {
+export default function EstimatedCostScreen({ navigation, route }) {
+    const { taskDescription, shareLocation, selectedImage, phoneNumbers, hardwareItems, worker } = route?.params || {};
     const [loading, setLoading] = useState(false);
 
     const handleConfirm = async () => {
@@ -14,7 +15,15 @@ export default function EstimatedCostScreen({ navigation }) {
             const userId = auth.currentUser?.uid || 'anonymous';
             await addDoc(collection(db, 'bookings'), {
                 userId,
+                workerId: worker?.id || null,
+                workerName: worker?.name || worker?.fullName || worker?.username || 'Service Provider',
+                workerTrade: worker?.trade || worker?.serviceType || '',
                 status: 'Confirmed',
+                taskDescription: taskDescription || '',
+                imageUri: selectedImage || null,
+                shareLocation: shareLocation ?? true,
+                phoneNumbers: phoneNumbers || [],
+                hardwareItems: hardwareItems || [],
                 serviceCharges: 0,
                 hardwareCharges: 0,
                 total: 0,
@@ -23,7 +32,7 @@ export default function EstimatedCostScreen({ navigation }) {
 
             setLoading(false);
             // Navigate to Tracking
-            navigation.navigate('WorkerTracking');
+            navigation.navigate('WorkerTracking', { worker });
         } catch (error) {
             setLoading(false);
             Alert.alert("Error", error.message);
@@ -79,7 +88,7 @@ export default function EstimatedCostScreen({ navigation }) {
                     </TouchableOpacity>
 
                     {/* Navigates back to Home Tab, completely cancelling the draft */}
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('HomeScreen')}>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('Home', { screen: 'HomeScreen' })}>
                         <Text style={styles.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
                 </View>

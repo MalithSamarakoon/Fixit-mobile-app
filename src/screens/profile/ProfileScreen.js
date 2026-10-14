@@ -21,6 +21,15 @@ export default function ProfileScreen({ navigation }) {
     const [experience, setExperience] = useState('');
     const [serviceCharges, setServiceCharges] = useState('');
 
+    // Availability Status (Requirement ix)
+    const STATUS_OPTIONS = [
+        { label: 'Available', color: '#10B981', bg: '#E6F8F0' },
+        { label: 'On duty', color: '#2C64E3', bg: '#EDF2FE' },
+        { label: 'Not on duty', color: '#EF4444', bg: '#FEE2E2' },
+    ];
+    const [status, setStatus] = useState('Available');
+    const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
     // Change Password Modal state
     const [modalVisible, setModalVisible] = useState(false);
     const [newPassword, setNewPassword] = useState('');
@@ -40,17 +49,31 @@ export default function ProfileScreen({ navigation }) {
                 setUserData(data);
                 
                 // Populate editable fields
-                setUsername(data.username || '');
-                setMobile(data.mobile || '');
+                setUsername(data.username || data.name || '');
+                setMobile(data.mobile || data.phone || '');
                 setLocation(data.location || '');
-                setServiceType(data.serviceType || '');
+                setServiceType(data.serviceType || data.trade || '');
                 setExperience(data.experience || '');
                 setServiceCharges(data.serviceCharges || '');
+                setStatus(data.status || 'Available');
             }
         } catch (error) {
             Alert.alert("Error", "Could not fetch user data");
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Instant status change in Firestore (Requirement ix)
+    const handleStatusChange = async (newStatus) => {
+        setStatus(newStatus);
+        setShowStatusDropdown(false);
+        if (!auth.currentUser) return;
+        try {
+            const docRef = doc(db, 'users', auth.currentUser.uid);
+            await updateDoc(docRef, { status: newStatus });
+        } catch (error) {
+            Alert.alert("Error", "Could not update status: " + error.message);
         }
     };
 
@@ -60,16 +83,21 @@ export default function ProfileScreen({ navigation }) {
         try {
             const updatePayload = {
                 username,
+                name: username,
                 mobile,
+                phone: mobile,
             };
 
             // Role specific fields
             if (userData.role === 'HouseOwner' || userData.role === 'HardwareShop') {
                 updatePayload.location = location;
             } else if (userData.role === 'TradeWorker') {
+                updatePayload.location = location;
                 updatePayload.serviceType = serviceType;
+                updatePayload.trade = serviceType;
                 updatePayload.experience = experience;
                 updatePayload.serviceCharges = serviceCharges;
+                updatePayload.status = status;
             }
 
             const docRef = doc(db, 'users', auth.currentUser.uid);
@@ -110,6 +138,8 @@ export default function ProfileScreen({ navigation }) {
         }
     };
 
+    const currentStatusOption = STATUS_OPTIONS.find(o => o.label === status) || STATUS_OPTIONS[0];
+
     if (loading) {
         return (
             <SafeAreaView style={styles.center}>
@@ -149,28 +179,77 @@ export default function ProfileScreen({ navigation }) {
                 </View>
 
                 <View style={styles.formContainer}>
+
+                    {/* Availability Status Section for TradeWorker (Requirement ix) */}
+                    {userData.role === 'TradeWorker' && (
+                        <View style={styles.statusSection}>
+                            <Text style={styles.label}>Availability Status</Text>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.statusSelectorBtn, 
+                                    { borderColor: currentStatusOption.color, backgroundColor: currentStatusOption.bg }
+                                ]}
+                                onPress={() => setShowStatusDropdown(!showStatusDropdown)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={[styles.statusDot, { backgroundColor: currentStatusOption.color }]} />
+                                    <Text style={[styles.statusSelectorText, { color: currentStatusOption.color }]}>
+                                        {status}
+                                    </Text>
+                                </View>
+                                <Ionicons 
+                                    name={showStatusDropdown ? "chevron-up" : "chevron-down"} 
+                                    size={18} 
+                                    color={currentStatusOption.color} 
+                                />
+                            </TouchableOpacity>
+
+                            {showStatusDropdown && (
+                                <View style={styles.statusDropdownMenu}>
+                                    {STATUS_OPTIONS.map((opt) => (
+                                        <TouchableOpacity
+                                            key={opt.label}
+                                            style={[
+                                                styles.statusOptionItem,
+                                                status === opt.label && { backgroundColor: opt.bg }
+                                            ]}
+                                            onPress={() => handleStatusChange(opt.label)}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <View style={[styles.statusDot, { backgroundColor: opt.color }]} />
+                                                <Text style={[styles.statusOptionText, { color: opt.color }]}>
+                                                    {opt.label}
+                                                </Text>
+                                            </View>
+                                            {status === opt.label && (
+                                                <Ionicons name="checkmark-circle" size={18} color={opt.color} />
+                                            )}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     <Text style={styles.label}>Name / Username</Text>
                     <TextInput style={styles.input} value={username} onChangeText={setUsername} />
 
                     <Text style={styles.label}>Mobile Number</Text>
                     <TextInput style={styles.input} value={mobile} onChangeText={setMobile} keyboardType="phone-pad" />
 
-                    {(userData.role === 'HouseOwner' || userData.role === 'HardwareShop') && (
-                        <>
-                            <Text style={styles.label}>Location / Address</Text>
-                            <TextInput style={styles.input} value={location} onChangeText={setLocation} />
-                        </>
-                    )}
+                    <Text style={styles.label}>Location / Working Area</Text>
+                    <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="e.g. Colombo 07" />
 
                     {userData.role === 'TradeWorker' && (
                         <>
-                            <Text style={styles.label}>Service Type</Text>
+                            <Text style={styles.label}>Service Type / Trade</Text>
                             <TextInput style={styles.input} value={serviceType} onChangeText={setServiceType} />
 
                             <Text style={styles.label}>Experience (Years)</Text>
                             <TextInput style={styles.input} value={experience} onChangeText={setExperience} keyboardType="numeric" />
 
-                            <Text style={styles.label}>Service Charges (LKR)</Text>
+                            <Text style={styles.label}>Service Charges (LKR/hr)</Text>
                             <TextInput style={styles.input} value={serviceCharges} onChangeText={setServiceCharges} keyboardType="numeric" />
                         </>
                     )}
@@ -235,6 +314,39 @@ const styles = StyleSheet.create({
     label: { fontSize: 13, fontWeight: 'bold', color: '#4B5563', marginBottom: 8, marginLeft: 5 },
     input: { backgroundColor: '#fff', borderRadius: 12, height: 50, paddingHorizontal: 15, fontSize: 14, color: '#111827', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20 },
     
+    statusSection: { marginBottom: 20 },
+    statusSelectorBtn: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        height: 50, 
+        borderRadius: 12, 
+        borderWidth: 1.5, 
+        paddingHorizontal: 16 
+    },
+    statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+    statusSelectorText: { fontSize: 15, fontWeight: 'bold' },
+    statusDropdownMenu: { 
+        backgroundColor: '#fff', 
+        borderRadius: 12, 
+        borderWidth: 1, 
+        borderColor: '#E5E7EB', 
+        marginTop: 6, 
+        overflow: 'hidden', 
+        elevation: 3, 
+        shadowColor: '#000', 
+        shadowOpacity: 0.08, 
+        shadowRadius: 5 
+    },
+    statusOptionItem: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        paddingVertical: 12, 
+        paddingHorizontal: 16 
+    },
+    statusOptionText: { fontSize: 14, fontWeight: '600' },
+
     saveBtn: { backgroundColor: '#5C8AF0', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
     saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 

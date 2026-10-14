@@ -1,14 +1,44 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { db } from '../../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export default function HomeScreen({ navigation }) {
-    // Static worker data
-    const workers = [
-        { id: 1, name: 'Anura Silva', role: 'Electrician', available: true },
-        { id: 2, name: 'Priyantha Perera', role: 'Plumber', available: true },
-        { id: 3, name: 'Sahan Nimesh', role: 'Electrician', available: true },
-    ];
+    const [workers, setWorkers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Fetch independently registered workers only
+    useEffect(() => {
+        const q = query(
+            collection(db, 'users'),
+            where('role', '==', 'TradeWorker')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = [];
+            snapshot.forEach((docSnap) => {
+                list.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            setWorkers(list);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching workers on HomeScreen:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const filteredWorkers = workers.filter(w => {
+        const queryStr = searchQuery.toLowerCase().trim();
+        if (!queryStr) return true;
+        const name = (w.name || w.username || '').toLowerCase();
+        const trade = (w.trade || w.serviceType || '').toLowerCase();
+        const loc = (w.location || '').toLowerCase();
+        return name.includes(queryStr) || trade.includes(queryStr) || loc.includes(queryStr);
+    });
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
@@ -31,7 +61,13 @@ export default function HomeScreen({ navigation }) {
             {/* Search Bar */}
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-                <TextInput style={styles.searchInput} placeholder="Search for services..." placeholderTextColor="#A0A0A0" />
+                <TextInput 
+                    style={styles.searchInput} 
+                    placeholder="Search for services..." 
+                    placeholderTextColor="#A0A0A0" 
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
             </View>
 
             {/* Top Cards (Agencies & Hardware) */}
@@ -56,35 +92,52 @@ export default function HomeScreen({ navigation }) {
             {/* Find Workers Section */}
             <Text style={styles.sectionTitle}>Find Workers</Text>
 
-            <TouchableOpacity style={styles.filterButton}>
+            <TouchableOpacity 
+                style={styles.filterButton} 
+                onPress={() => navigation.navigate('Workers')}
+            >
                 <Ionicons name="funnel-outline" size={16} color="#3B66FE" />
-                <Text style={styles.filterText}>Filter by service type</Text>
+                <Text style={styles.filterText}>View all workers</Text>
             </TouchableOpacity>
 
             {/* Worker List */}
-            {workers.map(worker => (
-                <View key={worker.id} style={styles.workerCard}>
-                    <View style={styles.workerAvatarPlaceholder}>
-                        <Ionicons name="person" size={24} color="#A0A0A0" />
-                    </View>
+            {loading ? (
+                <ActivityIndicator size="small" color="#3B66FE" style={{ marginVertical: 20 }} />
+            ) : filteredWorkers.length === 0 ? (
+                <Text style={{ color: '#888', textAlign: 'center', marginVertical: 20 }}>No independent workers found.</Text>
+            ) : (
+                filteredWorkers.map(worker => {
+                    const displayName = worker.name || worker.username || worker.fullName || 'Unnamed Worker';
+                    const displayTrade = worker.trade || worker.serviceType || 'General Worker';
+                    const statusColor = 
+                        worker.status === 'Available' ? '#10B981' : 
+                        worker.status === 'On duty' ? '#2C64E3' : '#EF4444';
 
-                    <View style={styles.workerInfo}>
-                        <View style={styles.workerHeaderRow}>
-                            <Text style={styles.workerName}>{worker.name}</Text>
-                            {worker.available && <View style={styles.statusDot} />}
+                    return (
+                        <View key={worker.id} style={styles.workerCard}>
+                            <View style={styles.workerAvatarPlaceholder}>
+                                <Ionicons name="person" size={24} color="#A0A0A0" />
+                            </View>
+
+                            <View style={styles.workerInfo}>
+                                <View style={styles.workerHeaderRow}>
+                                    <Text style={styles.workerName}>{displayName}</Text>
+                                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                                </View>
+
+                                <View style={styles.rolePill}>
+                                    <Text style={styles.roleText}>{displayTrade}</Text>
+                                </View>
+
+                                {/* Navigate to Profile, passing the worker data */}
+                                <TouchableOpacity onPress={() => navigation.navigate('WorkerProfile', { worker })}>
+                                    <Text style={styles.viewProfileText}>View Profile →</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-
-                        <View style={styles.rolePill}>
-                            <Text style={styles.roleText}>{worker.role}</Text>
-                        </View>
-
-                        {/* Navigate to Profile, passing the worker data */}
-                        <TouchableOpacity onPress={() => navigation.navigate('WorkerProfile', { worker })}>
-                            <Text style={styles.viewProfileText}>View Profile →</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            ))}
+                    );
+                })
+            )}
         </ScrollView>
     );
 }

@@ -3,14 +3,35 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Tex
 import { Ionicons } from '@expo/vector-icons';
 
 export default function WorkerProfileScreen({ route, navigation }) {
-    const { worker } = route.params;
+    const worker = route.params?.worker || {};
+
+    const getStatusTheme = (status) => {
+        switch (status) {
+            case 'Available':
+                return { color: '#10B981', bg: '#E6F8F0', label: 'Available' };
+            case 'On duty':
+                return { color: '#2C64E3', bg: '#EDF2FE', label: 'On duty' };
+            case 'Not on duty':
+                return { color: '#EF4444', bg: '#FEE2E2', label: 'Not on duty' };
+            default:
+                return { color: '#10B981', bg: '#E6F8F0', label: 'Available' };
+        }
+    };
+
+    const statusTheme = getStatusTheme(worker.status);
+    const displayName = worker.name || worker.username || worker.fullName || 'Professional Worker';
+    const displayTrade = worker.trade || worker.serviceType || worker.role || 'Service Specialist';
+    const displayPhone = worker.phone || worker.mobile || 'Contact on Booking';
+    const displayExperience = worker.experience ? `${worker.experience} Years` : 'Experienced';
+    const displayLocation = worker.location || 'All Island';
+    const displayCharges = worker.serviceCharges ? `LKR ${worker.serviceCharges}/hr` : 'Negotiable';
+    const displayRating = worker.rating ? Number(worker.rating).toFixed(1) : '5.0';
 
     return (
         <SafeAreaView style={styles.safeArea}>
             {/* Header with rounded outline buttons */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
-                    {/* Reusing a blank view or arrow depending on preference, standard is back */}
                     <Ionicons name="arrow-back" size={20} color="#1E2022" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Worker Profile</Text>
@@ -29,14 +50,14 @@ export default function WorkerProfileScreen({ route, navigation }) {
                             <Ionicons name="person" size={50} color="#A0A0A0" />
                         </View>
                     </View>
-                    <Text style={styles.name}>{worker.name}</Text>
+                    <Text style={styles.name}>{displayName}</Text>
 
                     <View style={styles.tagsRow}>
                         <View style={styles.rolePill}>
-                            <Text style={styles.roleText}>{worker.role}</Text>
+                            <Text style={styles.roleText}>{displayTrade}</Text>
                         </View>
-                        <View style={styles.statusPill}>
-                            <Text style={styles.statusText}>● Available</Text>
+                        <View style={[styles.statusPill, { backgroundColor: statusTheme.bg }]}>
+                            <Text style={[styles.statusText, { color: statusTheme.color }]}>● {statusTheme.label}</Text>
                         </View>
                     </View>
                     <View style={styles.verifiedPill}>
@@ -63,22 +84,22 @@ export default function WorkerProfileScreen({ route, navigation }) {
                     <View style={styles.infoRow}>
                         <View style={styles.infoColLeft}>
                             <Text style={styles.infoLabel}>Phone Number</Text>
-                            <Text style={styles.infoValue}>+94 77 123 4567</Text>
+                            <Text style={styles.infoValue}>{displayPhone}</Text>
                         </View>
                         <View style={styles.infoColRight}>
                             <Text style={styles.infoLabel}>Experience</Text>
-                            <Text style={styles.infoValue}>8 Years</Text>
+                            <Text style={styles.infoValue}>{displayExperience}</Text>
                         </View>
                     </View>
                     <View style={styles.divider} />
                     <View style={styles.infoRow}>
                         <View style={styles.infoColLeft}>
                             <Text style={styles.infoLabel}>Service Area</Text>
-                            <Text style={styles.infoValue}>Colombo & Suburbs</Text>
+                            <Text style={styles.infoValue}>{displayLocation}</Text>
                         </View>
                         <View style={styles.infoColRight}>
-                            <Text style={styles.infoLabel}>Active Jobs</Text>
-                            <Text style={[styles.infoValue, { color: '#2C64E3' }]}>2 Ongoing</Text>
+                            <Text style={styles.infoLabel}>Service Charges</Text>
+                            <Text style={[styles.infoValue, { color: '#2C64E3' }]}>{displayCharges}</Text>
                         </View>
                     </View>
                 </View>
@@ -88,7 +109,7 @@ export default function WorkerProfileScreen({ route, navigation }) {
                     <Text style={styles.sectionTitle}>Customer Ratings</Text>
                     <View style={styles.ratingScore}>
                         <Ionicons name="star" size={16} color="#F2A05B" />
-                        <Text style={styles.ratingScoreText}> 4 / 5</Text>
+                        <Text style={styles.ratingScoreText}> {displayRating} / 5</Text>
                     </View>
                 </View>
 
@@ -116,7 +137,10 @@ export default function WorkerProfileScreen({ route, navigation }) {
 
                 {/* Action Buttons */}
                 <View style={styles.buttonRow}>
-                    <TouchableOpacity style={styles.bookButton} onPress={() => navigation.navigate('TaskDescription')}>
+                    <TouchableOpacity 
+                        style={styles.bookButton} 
+                        onPress={() => navigation.navigate('TaskDescription', { worker })}
+                    >
                         <Text style={styles.bookButtonText}>Book</Text>
                     </TouchableOpacity>
 

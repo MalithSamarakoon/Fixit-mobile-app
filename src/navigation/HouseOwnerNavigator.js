@@ -16,6 +16,7 @@ import AgencyBookingFormScreen from '../screens/houseOwner/AgencyBookingFormScre
 
 
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import HouseOwnerWorkersScreen from '../screens/houseOwner/HouseOwnerWorkersScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -34,6 +35,20 @@ function HomeStack() {
             <Stack.Screen name="FindAgencies" component={FindAgenciesScreen} />
             <Stack.Screen name="AgencyBookingForm" component={AgencyBookingFormScreen} />
 
+        </Stack.Navigator>
+    );
+}
+
+// 2. Mini-Stack for the Workers Tab
+function WorkersStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="WorkersList" component={HouseOwnerWorkersScreen} />
+            <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} />
+            <Stack.Screen name="TaskDescription" component={TaskDescriptionScreen} />
+            <Stack.Screen name="EstimatedCost" component={EstimatedCostScreen} />
+            <Stack.Screen name="WorkerTracking" component={WorkerTrackingScreen} />
+            <Stack.Screen name="Feedback" component={FeedbackScreen} />
         </Stack.Navigator>
     );
 }
@@ -60,10 +75,10 @@ export default function HouseOwnerNavigator() {
             tabBarActiveTintColor: '#3B66FE',
             tabBarInactiveTintColor: '#A0A0A0',
         })}>
-            {/* 2. We use the HomeStack here instead of a simple screen */}
+            {/* We use stacks for seamless in-tab profile navigation */}
             <Tab.Screen name="Home" component={HomeStack} />
             <Tab.Screen name="Bookings" component={BookingsScreen} />
-            <Tab.Screen name="Workers" component={DummyScreen} />
+            <Tab.Screen name="Workers" component={WorkersStack} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
