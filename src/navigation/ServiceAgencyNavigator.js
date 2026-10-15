@@ -9,8 +9,14 @@ import HomeScreen from '../screens/serviceAgency/HomeScreen';
 import WorkersScreen from '../screens/serviceAgency/WorkersScreen';
 import AddWorkerScreen from '../screens/serviceAgency/AddWorkerScreen';
 import NewJobAssignmentScreen from '../screens/serviceAgency/NewJobAssignmentScreen';
-import BookingsScreen from '../screens/serviceAgency/BookingsScreen'; // NEW
-import ProfileScreen from '../screens/profile/ProfileScreen';
+import ComplaintsScreen from '../screens/serviceAgency/ComplaintsScreen';
+import BookingsScreen from '../screens/serviceAgency/BookingsScreen';
+import BookingDetailsScreen from '../screens/serviceAgency/BookingDetailsScreen';
+import AssignWorkerScreen from '../screens/serviceAgency/AssignWorkerScreen';
+import CustomerProfileScreen from '../screens/serviceAgency/CustomerProfileScreen';
+import WorkerProfileScreen from '../screens/serviceAgency/WorkerProfileScreen';
+import AgencyProfileScreen from '../screens/serviceAgency/AgencyProfileScreen';
+import PaymentAgencyScreen from '../screens/serviceAgency/paymentAgency';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -28,6 +34,8 @@ function HomeStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="AgencyHome" component={HomeScreen} />
             <Stack.Screen name="NewJobAssignment" component={NewJobAssignmentScreen} />
+            <Stack.Screen name="Complaints" component={ComplaintsScreen} />
+            <Stack.Screen name="paymentAgency" component={PaymentAgencyScreen} />
         </Stack.Navigator>
     );
 }
@@ -38,6 +46,21 @@ function WorkersStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="WorkersList" component={WorkersScreen} />
             <Stack.Screen name="AddWorker" component={AddWorkerScreen} />
+            <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} />
+        </Stack.Navigator>
+    );
+}
+
+// Stack for the Bookings Tab
+function BookingsStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="BookingsList" component={BookingsScreen} />
+            <Stack.Screen name="NewJobAssignment" component={NewJobAssignmentScreen} />
+            <Stack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+            <Stack.Screen name="AssignWorker" component={AssignWorkerScreen} />
+            <Stack.Screen name="CustomerProfile" component={CustomerProfileScreen} />
+            <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} />
         </Stack.Navigator>
     );
 }
@@ -60,9 +83,9 @@ export default function ServiceAgencyNavigator() {
             tabBarInactiveTintColor: '#A0A0A0',
         })}>
             <Tab.Screen name="Home" component={HomeStack} />
-            <Tab.Screen name="Bookings" component={BookingsScreen} />
+            <Tab.Screen name="Bookings" component={BookingsStack} />
             <Tab.Screen name="Workers" component={WorkersStack} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
+            <Tab.Screen name="Profile" component={AgencyProfileScreen} />
         </Tab.Navigator>
     );
 }
