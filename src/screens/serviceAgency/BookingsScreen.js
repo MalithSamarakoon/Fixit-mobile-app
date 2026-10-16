@@ -1,60 +1,121 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import CalendarPickerModal from './CalendarPickerModal';
 
-export default function BookingsScreen({ navigation }) {
+export default function BookingsScreen({ navigation, route }) {
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    const [dateFilter, setDateFilter] = useState('');
+    const [calendarModalVisible, setCalendarModalVisible] = useState(false);
 
     const filters = ['All', 'Pending', 'Assigned', 'Completed'];
 
-    // Dummy Bookings Data
-    const dummyBookings = [
-        { id: 'b1', ref: '#BK-1042', status: 'In Progress', service: 'Plumbing Repair', client: 'Kamal Perera', worker: 'Kasun Silva', time: 'Today, 10:30 AM' },
-        { id: 'b2', ref: '#BK-1041', status: 'Completed', service: 'Electrical Wiring', client: 'Nimisha Fernando', worker: 'Priyantha Perera', time: 'Yesterday' },
-        { id: 'b3', ref: '#BK-1040', status: 'Assigned', service: 'AC Servicing', client: 'Arjuna Silva', worker: 'Anushka J.', time: 'Tomorrow, 09:00 AM' },
-        { id: 'b4', ref: '#BK-1039', status: 'Pending', service: 'Carpentry Fitting', client: 'Ruwan Alwis', worker: 'Unassigned', time: 'Jan 18, 2026' },
-        { id: 'b5', ref: '#BK-1038', status: 'Cancelled', service: 'Water Leakage', client: 'Samanthi Cooray', worker: 'Kasun Silva', time: 'Jan 15, 2026' },
-        { id: 'b6', ref: '#BK-1037', status: 'Completed', service: 'Painting Interior', client: 'Upul Jayasinghe', worker: 'Nimali Cooray', time: 'Jan 12, 2026' }
-    ];
+    useEffect(() => {
+        const agencyId = auth.currentUser?.uid;
+        if (!agencyId) {
+            setBookings([]);
+            setLoading(false);
+            return;
+        }
+
+        const q = query(
+            collection(db, 'bookings'),
+            where('agencyId', '==', agencyId)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = [];
+            snapshot.forEach((docSnap) => {
+                list.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            setBookings(list);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const nextFilter = route?.params?.filter;
+        if (nextFilter && filters.includes(nextFilter)) {
+            setActiveFilter(nextFilter);
+        } else if (route?.params && !nextFilter) {
+            setActiveFilter('All');
+        }
+    }, [route?.params]);
 
     const getStatusStyle = (status) => {
         switch (status) {
             case 'Completed': return { bg: '#ECFDF5', text: '#10B981' };
             case 'Assigned': return { bg: '#EEF2FF', text: '#5C8AF0' };
             case 'Cancelled': return { bg: '#FEF2F2', text: '#EF4444' };
-            default: return { bg: '#FEF3C7', text: '#D97706' }; // Pending, In Progress
+            default: return { bg: '#FEF3C7', text: '#D97706' };
         }
     };
 
-    const filteredBookings = activeFilter === 'All'
-        ? dummyBookings
-        : dummyBookings.filter(b => b.status === activeFilter || (activeFilter === 'Pending' && b.status === 'In Progress')); // Quick hack to show In Progress under Pending filter
+    const matchesFilter = (bookingStatus, filter) => {
+        if (filter === 'All') return true;
+        if (filter === 'Pending') return ['Pending', 'Request Sent'].includes(bookingStatus);
+        if (filter === 'Assigned') return ['Assigned', 'In Progress'].includes(bookingStatus);
+        return bookingStatus === filter;
+    };
+
+    const filteredBookings = bookings
+        .filter((booking) => matchesFilter(booking.status, activeFilter))
+        .filter((item) => {
+            if (dateFilter) {
+                const bookingDate = item.preferredDate || item.date || '';
+                if (bookingDate !== dateFilter) return false;
+            }
+            const term = searchQuery.trim().toLowerCase();
+            if (!term) return true;
+            const refText = String(item.ref || item.id || '').toLowerCase();
+            const clientText = String(item.customerName || item.client || '').toLowerCase();
+            return refText.includes(term) || clientText.includes(term);
+        });
 
     const renderItem = ({ item }) => {
         const statusStyle = getStatusStyle(item.status);
+        const refLabel = item.ref || `#BK-${String(item.id || '').slice(0, 5).toUpperCase()}`;
+        const serviceText = item.serviceType || item.service || 'Service Request';
+        const clientText = item.customerName || item.client || 'Client';
+        const workerText = item.assignedWorkerName || item.worker || 'Unassigned';
+        const timeText = item.preferredDate || item.time || 'No date';
+        const isPending = ['Pending', 'Request Sent'].includes(item.status);
 
         return (
             <View style={styles.card}>
                 <View style={styles.cardTop}>
-                    <Text style={styles.refText}>{item.ref}</Text>
+                    <Text style={styles.refText}>{refLabel}</Text>
                     <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
                         <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
                     </View>
                 </View>
 
-                <Text style={styles.serviceText}>{item.service}</Text>
-                <Text style={styles.infoText}>Client: {item.client}</Text>
-                <Text style={styles.infoText}>Worker: {item.worker}</Text>
+                <Text style={styles.serviceText}>{serviceText}</Text>
+                <Text style={styles.infoText}>Client: {clientText}</Text>
+                <Text style={styles.infoText}>Worker: {workerText}</Text>
 
                 <View style={styles.divider} />
 
                 <View style={styles.cardBottom}>
-                    <Text style={styles.timeText}>{item.time}</Text>
-                    <TouchableOpacity style={styles.detailsBtn}>
-                        <Text style={styles.detailsBtnText}>Details </Text>
-                        <Ionicons name="chevron-forward" size={12} color="#5C8AF0" />
-                    </TouchableOpacity>
+                    <Text style={styles.timeText}>{timeText}</Text>
+                    <View style={styles.actionRow}>
+                        {isPending && (
+                            <TouchableOpacity style={styles.assignSmallBtn} onPress={() => navigation.navigate('AssignWorker', { bookingId: item.id })}>
+                                <Text style={styles.assignSmallBtnText}>Assign</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={styles.detailsBtn} onPress={() => navigation.navigate('BookingDetails', { bookingId: item.id })}>
+                            <Text style={styles.detailsBtnText}>Details </Text>
+                            <Ionicons name="chevron-forward" size={12} color="#5C8AF0" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
         );
@@ -70,9 +131,16 @@ export default function BookingsScreen({ navigation }) {
 
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Bookings</Text>
-                <TouchableOpacity style={styles.calendarBtn}>
-                    <Ionicons name="calendar-outline" size={20} color="#111827" />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                    {dateFilter ? (
+                        <TouchableOpacity style={styles.clearDateBtn} onPress={() => setDateFilter('')}>
+                            <Text style={styles.clearDateText}>Clear</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity style={styles.calendarBtn} onPress={() => setCalendarModalVisible(true)}>
+                        <Ionicons name="calendar-outline" size={20} color="#111827" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.searchContainer}>
@@ -85,6 +153,13 @@ export default function BookingsScreen({ navigation }) {
                     onChangeText={setSearchQuery}
                 />
             </View>
+
+            {dateFilter ? (
+                <View style={styles.activeDateRow}>
+                    <Text style={styles.activeDateLabel}>Filtered on</Text>
+                    <Text style={styles.activeDateText}>{new Date(`${dateFilter}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '')}</Text>
+                </View>
+            ) : null}
 
             <View style={styles.filterWrapper}>
                 <FlatList
@@ -108,13 +183,29 @@ export default function BookingsScreen({ navigation }) {
                 />
             </View>
 
-            <FlatList
-                data={filteredBookings}
-                keyExtractor={item => item.id}
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContainer}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={<Text style={styles.emptyText}>No bookings found.</Text>}
+            {loading ? (
+                <ActivityIndicator size="large" color="#5C8AF0" style={{ marginTop: 30 }} />
+            ) : (
+                <FlatList
+                    data={filteredBookings}
+                    keyExtractor={item => item.id}
+                    renderItem={renderItem}
+                    contentContainerStyle={styles.listContainer}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={<Text style={styles.emptyText}>No bookings found.</Text>}
+                />
+            )}
+
+            <CalendarPickerModal
+                visible={calendarModalVisible}
+                selectedDate={dateFilter}
+                minDate={new Date().toISOString().slice(0, 10)}
+                title="Filter bookings by date"
+                onSelect={(date) => {
+                    setDateFilter(date || '');
+                    setCalendarModalVisible(false);
+                }}
+                onClose={() => setCalendarModalVisible(false)}
             />
         </SafeAreaView>
     );
@@ -128,11 +219,18 @@ const styles = StyleSheet.create({
 
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
     headerTitle: { fontSize: 26, fontWeight: 'bold', color: '#111827' },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    clearDateBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EEF2FF' },
+    clearDateText: { color: '#5C8AF0', fontSize: 11, fontWeight: '700' },
     calendarBtn: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: '#EEF2F6', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
 
     searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 20, borderRadius: 12, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: '#EEF2F6', marginBottom: 15 },
     searchIcon: { marginRight: 8 },
     searchInput: { flex: 1, fontSize: 14, color: '#111827' },
+
+    activeDateRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, backgroundColor: '#EEF2FF', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+    activeDateLabel: { color: '#5C8AF0', fontSize: 12, fontWeight: '700', marginRight: 8 },
+    activeDateText: { color: '#111827', fontSize: 12, fontWeight: '700' },
 
     filterWrapper: { paddingLeft: 20, marginBottom: 15 },
     filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#EEF2F6', marginRight: 10, backgroundColor: '#fff' },
@@ -157,6 +255,9 @@ const styles = StyleSheet.create({
 
     cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     timeText: { fontSize: 12, color: '#A0A0A0' },
+    actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    assignSmallBtn: { backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+    assignSmallBtnText: { color: '#5C8AF0', fontSize: 11, fontWeight: '700' },
     detailsBtn: { flexDirection: 'row', alignItems: 'center' },
     detailsBtnText: { color: '#5C8AF0', fontSize: 13, fontWeight: 'bold', marginRight: 4 }
 });
