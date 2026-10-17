@@ -19,7 +19,12 @@ import { signOut, updatePassword } from 'firebase/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../../config/firebase';
 import { AuthContext } from '../../context/AuthContext';
-import { belongsToShop, validatePhone } from './hardwareShopHelpers';
+import {
+    PHONE_VALIDATION_ERROR,
+    belongsToShop,
+    sanitizePhoneNumber,
+    validatePhone,
+} from './hardwareShopHelpers';
 
 export default function ShopProfileScreen({ navigation }) {
     const { setUserRole } = useContext(AuthContext);
@@ -87,10 +92,12 @@ export default function ShopProfileScreen({ navigation }) {
                 ordersCount: ordersSnap.docs.length,
             });
 
+            const initialMobile = sanitizePhoneNumber(data.mobile || data.phone || '');
+
             setForm({
                 shopName: data.shopName || data.name || data.username || 'Hardware Store',
                 ownerName: data.ownerName || data.username || data.name || '',
-                mobile: data.mobile || data.phone || '',
+                mobile: initialMobile,
                 location: data.location || data.address || '',
                 businessHours: data.businessHours || 'Mon - Sat: 8:00 AM - 6:30 PM',
                 deliveryAvailable: data.deliveryAvailable !== false,
@@ -110,6 +117,23 @@ export default function ShopProfileScreen({ navigation }) {
         }, [loadProfileData])
     );
 
+    // Real-time phone number change with strict validation
+    const handleMobileChange = (text) => {
+        // Rule: Accept numbers only, reject letters/symbols/spaces, max 10 digits
+        const sanitized = sanitizePhoneNumber(text);
+        setForm((prev) => ({ ...prev, mobile: sanitized }));
+
+        // Real-time validation message: "Phone number must contain exactly 10 digits."
+        if (sanitized.length === 0) {
+            setFormErrors((prev) => ({ ...prev, mobile: 'Phone number is required.' }));
+        } else if (sanitized.length < 10) {
+            setFormErrors((prev) => ({ ...prev, mobile: PHONE_VALIDATION_ERROR }));
+        } else if (sanitized.length === 10) {
+            // Exactly 10 digits -> clear error
+            setFormErrors((prev) => ({ ...prev, mobile: null }));
+        }
+    };
+
     const validateEditForm = () => {
         const errs = {};
         if (!form.shopName.trim()) {
@@ -118,11 +142,14 @@ export default function ShopProfileScreen({ navigation }) {
         if (!form.ownerName.trim()) {
             errs.ownerName = 'Owner / Contact person name is required.';
         }
-        if (!form.mobile.trim()) {
-            errs.mobile = 'Mobile phone number is required.';
+
+        // Phone validation on submit: exactly 10 numeric digits
+        if (!form.mobile) {
+            errs.mobile = 'Phone number is required.';
         } else if (!validatePhone(form.mobile)) {
-            errs.mobile = 'Please enter a valid phone number (9-10 digits).';
+            errs.mobile = PHONE_VALIDATION_ERROR;
         }
+
         if (!form.location.trim()) {
             errs.location = 'Shop location / address is required.';
         }
@@ -140,13 +167,16 @@ export default function ShopProfileScreen({ navigation }) {
         setSaving(true);
         try {
             const uid = auth.currentUser.uid;
+            // Preserving phone as string to retain leading zeros (e.g. "0771234567")
+            const cleanPhoneString = String(form.mobile);
+
             const updatePayload = {
                 shopName: form.shopName.trim(),
                 name: form.shopName.trim(),
                 username: form.shopName.trim(),
                 ownerName: form.ownerName.trim(),
-                mobile: form.mobile.trim(),
-                phone: form.mobile.trim(),
+                mobile: cleanPhoneString,
+                phone: cleanPhoneString,
                 location: form.location.trim(),
                 address: form.location.trim(),
                 businessHours: form.businessHours.trim(),
@@ -430,19 +460,26 @@ export default function ShopProfileScreen({ navigation }) {
                             />
                             {formErrors.ownerName && <Text style={styles.errText}>{formErrors.ownerName}</Text>}
 
+                            {/* Contact Phone Number Input with strict 10-digit validation */}
                             <Text style={styles.inputLabel}>
-                                Contact Phone Number <Text style={styles.req}>*</Text>
+                                Contact Phone Number (10 Digits) <Text style={styles.req}>*</Text>
                             </Text>
                             <TextInput
                                 style={[styles.input, formErrors.mobile && styles.inputErr]}
-                                keyboardType="phone-pad"
+                                keyboardType="number-pad"
+                                maxLength={10}
                                 value={form.mobile}
-                                onChangeText={(t) => {
-                                    setForm((p) => ({ ...p, mobile: t }));
-                                    if (formErrors.mobile) setFormErrors((p) => ({ ...p, mobile: null }));
-                                }}
+                                onChangeText={handleMobileChange}
+                                placeholder="0771234567"
+                                placeholderTextColor="#A0A0A0"
                             />
-                            {formErrors.mobile && <Text style={styles.errText}>{formErrors.mobile}</Text>}
+                            {formErrors.mobile ? (
+                                <Text style={styles.errText}>{formErrors.mobile}</Text>
+                            ) : (
+                                <Text style={styles.inputHelperText}>
+                                    {form.mobile.length}/10 digits • Numbers only
+                                </Text>
+                            )}
 
                             <Text style={styles.inputLabel}>
                                 Store Location / Address <Text style={styles.req}>*</Text>
@@ -719,6 +756,7 @@ const styles = StyleSheet.create({
     },
     inputErr: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
     errText: { color: '#EF4444', fontSize: 11, marginTop: 3 },
+    inputHelperText: { color: '#6B7280', fontSize: 11, marginTop: 3 },
     textArea: { height: 70, textAlignVertical: 'top', paddingTop: 8 },
 
     switchRow: {
