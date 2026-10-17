@@ -17,6 +17,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { formatCurrency, getOrderStatusStyle } from './hardwareShopHelpers';
 import { addHardwareOrderNote, deleteHardwareOrder, updateHardwareOrderStatus } from './hardwareShopOrdersService';
+import DeliveryRouteModal from './DeliveryRouteModal';
 
 const STATUS_STEPS = ['Pending', 'Confirmed', 'In Progress', 'Delivered'];
 
@@ -25,6 +26,9 @@ export default function OrderDetailsScreen({ route, navigation }) {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+
+    // Delivery Route Tracking Modal
+    const [showRouteModal, setShowRouteModal] = useState(false);
 
     // Notes state
     const [noteText, setNoteText] = useState('');
@@ -379,7 +383,7 @@ export default function OrderDetailsScreen({ route, navigation }) {
                     <View style={styles.specDivider} />
 
                     <View style={styles.locationWrap}>
-                        <Ionicons name="location-outline" size={18} color="#6B7280" style={{ marginRight: 8, marginTop: 2 }} />
+                        <Ionicons name="location-outline" size={18} color="#2563EB" style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.locationTitle}>Delivery Address</Text>
                             <Text style={styles.locationText}>
@@ -387,6 +391,24 @@ export default function OrderDetailsScreen({ route, navigation }) {
                             </Text>
                         </View>
                     </View>
+
+                    {/* GPS Delivery Route Action Button */}
+                    <TouchableOpacity
+                        style={styles.trackDeliveryCardBtn}
+                        onPress={() => setShowRouteModal(true)}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.trackDeliveryIconWrap}>
+                            <Ionicons name="map" size={18} color="#fff" />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.trackDeliveryTitle}>View Delivery Location & Route</Text>
+                            <Text style={styles.trackDeliverySub}>
+                                Interactive GPS map, driving path & estimated travel time
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#2563EB" />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Order Items Card */}
@@ -529,6 +551,13 @@ export default function OrderDetailsScreen({ route, navigation }) {
                     </View>
                 </View>
             </Modal>
+
+            {/* GPS Delivery Route Modal */}
+            <DeliveryRouteModal
+                visible={showRouteModal}
+                order={order}
+                onClose={() => setShowRouteModal(false)}
+            />
         </SafeAreaView>
     );
 }
@@ -695,6 +724,27 @@ const styles = StyleSheet.create({
     locationWrap: { flexDirection: 'row', alignItems: 'flex-start' },
     locationTitle: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', marginBottom: 2 },
     locationText: { fontSize: 14, color: '#374151', lineHeight: 20 },
+
+    trackDeliveryCardBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0F5FF',
+        borderRadius: 14,
+        padding: 12,
+        marginTop: 14,
+        borderWidth: 1,
+        borderColor: '#D8E5FE',
+    },
+    trackDeliveryIconWrap: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#2563EB',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    trackDeliveryTitle: { fontSize: 13, fontWeight: 'bold', color: '#1E2022' },
+    trackDeliverySub: { fontSize: 11, color: '#6B7280', marginTop: 2, lineHeight: 15 },
 
     itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
     itemQtyBadge: {

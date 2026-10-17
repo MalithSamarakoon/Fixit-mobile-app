@@ -19,6 +19,8 @@ import { signOut, updatePassword } from 'firebase/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../../config/firebase';
 import { AuthContext } from '../../context/AuthContext';
+import { belongsToShop, validatePhone } from './hardwareShopHelpers';
+import { geocodeAddress } from './hardwareDeliveryRouteService';
 import {
     PHONE_VALIDATION_ERROR,
     belongsToShop,
@@ -167,6 +169,7 @@ export default function ShopProfileScreen({ navigation }) {
         setSaving(true);
         try {
             const uid = auth.currentUser.uid;
+            const cleanLoc = form.location.trim();
             // Preserving phone as string to retain leading zeros (e.g. "0771234567")
             const cleanPhoneString = String(form.mobile);
 
@@ -177,13 +180,23 @@ export default function ShopProfileScreen({ navigation }) {
                 ownerName: form.ownerName.trim(),
                 mobile: cleanPhoneString,
                 phone: cleanPhoneString,
-                location: form.location.trim(),
-                address: form.location.trim(),
+                location: cleanLoc,
+                address: cleanLoc,
                 businessHours: form.businessHours.trim(),
                 deliveryAvailable: form.deliveryAvailable,
                 businessRegNo: form.businessRegNo.trim(),
                 about: form.about.trim(),
             };
+
+            // Attempt to resolve and save GPS coordinates for delivery routing
+            try {
+                const geo = await geocodeAddress(cleanLoc, true);
+                if (geo && geo.lat && geo.lng) {
+                    updatePayload.coordinates = { lat: geo.lat, lng: geo.lng };
+                }
+            } catch (geoErr) {
+                console.warn('Shop profile geocoding error:', geoErr.message);
+            }
 
             await updateDoc(doc(db, 'users', uid), updatePayload);
             setUserData((prev) => ({ ...prev, ...updatePayload }));
