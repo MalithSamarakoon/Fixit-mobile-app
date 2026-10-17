@@ -13,21 +13,9 @@ import {
 import { DEFAULT_HARDWARE_ORDERS } from './hardwareShopHelpers';
 
 export async function ensureSeedHardwareOrders(shopOwnerId) {
-    if (!shopOwnerId) return;
-
-    const q = query(collection(db, 'hardwareOrders'), where('shopOwnerId', '==', shopOwnerId));
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) return;
-
-    await Promise.all(
-        DEFAULT_HARDWARE_ORDERS.map((order) =>
-            addDoc(collection(db, 'hardwareOrders'), {
-                ...order,
-                shopOwnerId,
-                createdAt: serverTimestamp(),
-            })
-        )
-    );
+    // Dummy order generation removed per requirements.
+    // Newly registered Hardware Shop Owners see an empty Orders interface until actual House Owners place orders.
+    return;
 }
 
 export async function updateHardwareOrderStatus(orderId, status, additionalData = {}) {

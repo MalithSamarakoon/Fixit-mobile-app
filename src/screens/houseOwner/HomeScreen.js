@@ -80,7 +80,11 @@ export default function HomeScreen({ navigation }) {
                     <Text style={styles.cardSubtitle}>Professional teams</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.topCard}>
+                <TouchableOpacity
+                    style={styles.topCard}
+                    onPress={() => navigation.navigate('HardwareProducts')}
+                    activeOpacity={0.8}
+                >
                     <View style={[styles.iconWrapper, { backgroundColor: '#FFF7E6' }]}>
                         <Ionicons name="hardware-chip" size={24} color="#F2A05B" />
                     </View>

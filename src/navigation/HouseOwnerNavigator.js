@@ -13,7 +13,11 @@ import FeedbackScreen from '../screens/houseOwner/FeedbackScreen';
 import BookingsScreen from '../screens/houseOwner/BookingsScreen';
 import FindAgenciesScreen from '../screens/houseOwner/FindAgenciesScreen';
 import AgencyBookingFormScreen from '../screens/houseOwner/AgencyBookingFormScreen';
-
+import HardwareProductsScreen from '../screens/houseOwner/HardwareProductsScreen';
+import HardwareProductDetailsScreen from '../screens/houseOwner/HardwareProductDetailsScreen';
+import HardwareCartScreen from '../screens/houseOwner/HardwareCartScreen';
+import HouseOwnerOrdersScreen from '../screens/houseOwner/HouseOwnerOrdersScreen';
+import { CartProvider } from '../context/CartContext';
 
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import HouseOwnerWorkersScreen from '../screens/houseOwner/HouseOwnerWorkersScreen';
@@ -35,6 +39,11 @@ function HomeStack() {
             <Stack.Screen name="FindAgencies" component={FindAgenciesScreen} />
             <Stack.Screen name="AgencyBookingForm" component={AgencyBookingFormScreen} />
 
+            {/* Hardware Store & Ordering Flow */}
+            <Stack.Screen name="HardwareProducts" component={HardwareProductsScreen} />
+            <Stack.Screen name="HardwareProductDetails" component={HardwareProductDetailsScreen} />
+            <Stack.Screen name="HardwareCart" component={HardwareCartScreen} />
+            <Stack.Screen name="HouseOwnerOrders" component={HouseOwnerOrdersScreen} />
         </Stack.Navigator>
     );
 }
@@ -61,26 +70,28 @@ const DummyScreen = ({ route }) => (
 
 export default function HouseOwnerNavigator() {
     return (
-        <Tab.Navigator screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarStyle: { backgroundColor: '#fff', borderTopWidth: 0, elevation: 10 },
-            tabBarIcon: ({ color, size }) => {
-                let iconName;
-                if (route.name === 'Home') iconName = 'home';
-                else if (route.name === 'Bookings') iconName = 'calendar';
-                else if (route.name === 'Workers') iconName = 'people';
-                else if (route.name === 'Profile') iconName = 'person';
-                return <Ionicons name={iconName} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: '#3B66FE',
-            tabBarInactiveTintColor: '#A0A0A0',
-        })}>
-            {/* We use stacks for seamless in-tab profile navigation */}
-            <Tab.Screen name="Home" component={HomeStack} />
-            <Tab.Screen name="Bookings" component={BookingsScreen} />
-            <Tab.Screen name="Workers" component={WorkersStack} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
-        </Tab.Navigator>
+        <CartProvider>
+            <Tab.Navigator screenOptions={({ route }) => ({
+                headerShown: false,
+                tabBarStyle: { backgroundColor: '#fff', borderTopWidth: 0, elevation: 10 },
+                tabBarIcon: ({ color, size }) => {
+                    let iconName;
+                    if (route.name === 'Home') iconName = 'home';
+                    else if (route.name === 'Bookings') iconName = 'calendar';
+                    else if (route.name === 'Workers') iconName = 'people';
+                    else if (route.name === 'Profile') iconName = 'person';
+                    return <Ionicons name={iconName} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: '#3B66FE',
+                tabBarInactiveTintColor: '#A0A0A0',
+            })}>
+                {/* We use stacks for seamless in-tab profile navigation */}
+                <Tab.Screen name="Home" component={HomeStack} />
+                <Tab.Screen name="Bookings" component={BookingsScreen} />
+                <Tab.Screen name="Workers" component={WorkersStack} />
+                <Tab.Screen name="Profile" component={ProfileScreen} />
+            </Tab.Navigator>
+        </CartProvider>
     );
 }
 
