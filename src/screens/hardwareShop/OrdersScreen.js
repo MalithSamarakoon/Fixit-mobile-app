@@ -16,6 +16,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { formatCurrency, getOrderStatusStyle } from './hardwareShopHelpers';
 import { ensureSeedHardwareOrders } from './hardwareShopOrdersService';
+import DeliveryRouteModal from './DeliveryRouteModal';
 
 const STATUS_TABS = ['All', 'Pending', 'In Progress', 'Confirmed', 'Delivered', 'Rejected'];
 
@@ -25,6 +26,7 @@ export default function OrdersScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('All');
+    const [routeOrder, setRouteOrder] = useState(null);
 
     const shopOwnerId = auth.currentUser?.uid;
 
@@ -145,6 +147,15 @@ export default function OrdersScreen({ navigation }) {
                     </Text>
                 ) : null}
 
+                {item.deliveryLocation ? (
+                    <View style={styles.locationSnippetRow}>
+                        <Ionicons name="location-outline" size={13} color="#2563EB" style={{ marginRight: 4 }} />
+                        <Text style={styles.locationSnippetText} numberOfLines={1}>
+                            {item.deliveryLocation}
+                        </Text>
+                    </View>
+                ) : null}
+
                 <View style={styles.orderDivider} />
 
                 <View style={styles.orderCardBottom}>
@@ -153,13 +164,24 @@ export default function OrdersScreen({ navigation }) {
                         <Text style={styles.totalAmount}>{formatCurrency(item.total)}</Text>
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.viewOrderBtn}
-                        onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
-                    >
-                        <Text style={styles.viewOrderText}>View Order</Text>
-                        <Ionicons name="chevron-forward" size={14} color="#5C8AF0" />
-                    </TouchableOpacity>
+                    <View style={styles.cardActionsRow}>
+                        <TouchableOpacity
+                            style={styles.trackDeliveryCardBtn}
+                            onPress={() => setRouteOrder(item)}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="map-outline" size={13} color="#2563EB" style={{ marginRight: 4 }} />
+                            <Text style={styles.trackDeliveryCardBtnText}>Track</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.viewOrderBtn}
+                            onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
+                        >
+                            <Text style={styles.viewOrderText}>View</Text>
+                            <Ionicons name="chevron-forward" size={14} color="#5C8AF0" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -277,6 +299,13 @@ export default function OrdersScreen({ navigation }) {
                     }
                 />
             )}
+
+            {/* Delivery Route Modal */}
+            <DeliveryRouteModal
+                visible={!!routeOrder}
+                order={routeOrder}
+                onClose={() => setRouteOrder(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -384,11 +413,34 @@ const styles = StyleSheet.create({
     orderTime: { fontSize: 11, color: '#9CA3AF' },
 
     itemsSummary: { fontSize: 12, color: '#6B7280', marginTop: 10, fontStyle: 'italic' },
+    locationSnippetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+        backgroundColor: '#F0F5FF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    locationSnippetText: { fontSize: 11, color: '#2563EB', fontWeight: '500', flex: 1 },
+
     orderDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
 
     orderCardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     totalLabel: { fontSize: 11, color: '#9CA3AF' },
     totalAmount: { fontSize: 16, fontWeight: '900', color: '#111827' },
+    cardActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    trackDeliveryCardBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+    },
+    trackDeliveryCardBtnText: { color: '#2563EB', fontSize: 12, fontWeight: 'bold', marginLeft: 3 },
     viewOrderBtn: {
         flexDirection: 'row',
         alignItems: 'center',
