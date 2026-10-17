@@ -30,18 +30,10 @@ export default function OrdersScreen({ navigation }) {
 
     const shopOwnerId = auth.currentUser?.uid;
 
-    const loadOrders = async () => {
-        if (shopOwnerId) {
-            await ensureSeedHardwareOrders(shopOwnerId);
-        }
-    };
-
     useEffect(() => {
         let unsubscribe = () => {};
 
         const start = async () => {
-            await loadOrders();
-
             const q = shopOwnerId
                 ? query(collection(db, 'hardwareOrders'), where('shopOwnerId', '==', shopOwnerId))
                 : query(collection(db, 'hardwareOrders'));
@@ -268,7 +260,7 @@ export default function OrdersScreen({ navigation }) {
                             refreshing={refreshing}
                             onRefresh={() => {
                                 setRefreshing(true);
-                                loadOrders();
+                                setTimeout(() => setRefreshing(false), 500);
                             }}
                             tintColor="#5C8AF0"
                         />

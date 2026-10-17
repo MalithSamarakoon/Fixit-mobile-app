@@ -25,7 +25,17 @@ import {
     query,
     orderBy,
 } from 'firebase/firestore';
-import { belongsToShop } from './hardwareShopHelpers';
+import {
+    belongsToShop,
+    isDateBefore,
+    isDatePast,
+    parseDateAtMidnight,
+} from './hardwareShopHelpers';
+import CalendarDatePickerModal, {
+    toFriendlyDateString,
+    parseDate,
+    toDateString,
+} from './CalendarDatePickerModal';
 
 export default function AdsPromosScreen() {
     const [activeTab, setActiveTab] = useState('ads'); // 'ads' | 'discounts'
@@ -34,6 +44,16 @@ export default function AdsPromosScreen() {
     const [loading, setLoading] = useState(true);
 
     const shopOwnerId = auth.currentUser?.uid;
+
+    // Calendar Date Picker Modal State
+    const [datePickerConfig, setDatePickerConfig] = useState({
+        visible: false,
+        title: 'Select Date',
+        initialDate: null,
+        minDate: null,
+        maxDate: null,
+        onSelect: null,
+    });
 
     // Ad Form State
     const [showAdForm, setShowAdForm] = useState(false);
@@ -54,6 +74,7 @@ export default function AdsPromosScreen() {
     const [discountCode, setDiscountCode] = useState('');
     const [discountValue, setDiscountValue] = useState('15% OFF');
     const [discountValidity, setDiscountValidity] = useState('');
+    const [discountExpiryDate, setDiscountExpiryDate] = useState('');
     const [discountStatus, setDiscountStatus] = useState('ONGOING');
     const [discountErrors, setDiscountErrors] = useState({});
     const [savingDiscount, setSavingDiscount] = useState(false);
@@ -123,6 +144,62 @@ export default function AdsPromosScreen() {
         }
     };
 
+    // Calendar Pickers triggers
+    const openStartDatePicker = () => {
+        setDatePickerConfig({
+            visible: true,
+            title: 'Select Campaign Start Date',
+            initialDate: startDate || new Date(),
+            minDate: new Date(), // Prevent past dates for new campaign start
+            maxDate: null,
+            onSelect: (iso, friendly) => {
+                setStartDate(iso);
+                if (adErrors.startDate) setAdErrors((prev) => ({ ...prev, startDate: null }));
+
+                // If end date exists and is earlier than selected start date, prompt/clear end date
+                if (endDate && isDateBefore(endDate, iso)) {
+                    setEndDate('');
+                    setAdErrors((prev) => ({
+                        ...prev,
+                        endDate: 'End date was earlier than start date and was cleared.',
+                    }));
+                }
+            },
+        });
+    };
+
+    const openEndDatePicker = () => {
+        // End date cannot be earlier than start date, or earlier than today
+        const minimumEndDate = startDate ? parseDateAtMidnight(startDate) : new Date();
+
+        setDatePickerConfig({
+            visible: true,
+            title: 'Select Campaign End Date',
+            initialDate: endDate || startDate || new Date(),
+            minDate: minimumEndDate,
+            maxDate: null,
+            onSelect: (iso, friendly) => {
+                setEndDate(iso);
+                if (adErrors.endDate) setAdErrors((prev) => ({ ...prev, endDate: null }));
+            },
+        });
+    };
+
+    const openDiscountDatePicker = () => {
+        setDatePickerConfig({
+            visible: true,
+            title: 'Select Coupon Expiry Date',
+            initialDate: discountExpiryDate || new Date(),
+            minDate: new Date(), // Coupon expiry cannot be in the past
+            maxDate: null,
+            onSelect: (iso, friendly) => {
+                setDiscountExpiryDate(iso);
+                setDiscountValidity(`Valid until ${friendly}`);
+                if (discountErrors.validity) setDiscountErrors((prev) => ({ ...prev, validity: null }));
+            },
+        });
+    };
+
     // Ad Actions
     const resetAdForm = () => {
         setEditingAdId(null);
@@ -178,8 +255,19 @@ export default function AdsPromosScreen() {
         const errors = {};
         if (!title.trim()) errors.title = 'Ad title is required.';
         if (!description.trim()) errors.description = 'Ad description is required.';
-        if (!startDate.trim()) errors.startDate = 'Start date is required.';
-        if (!endDate.trim()) errors.endDate = 'End date is required.';
+
+        if (!startDate) {
+            errors.startDate = 'Start date is required.';
+        } else if (isDatePast(startDate) && !editingAdId) {
+            // For new ads, start date cannot be in the past
+            errors.startDate = 'Start date cannot be in the past.';
+        }
+
+        if (!endDate) {
+            errors.endDate = 'End date is required.';
+        } else if (startDate && isDateBefore(endDate, startDate)) {
+            errors.endDate = 'End date cannot be earlier than start date.';
+        }
 
         setAdErrors(errors);
         return Object.keys(errors).length === 0;
@@ -196,8 +284,8 @@ export default function AdsPromosScreen() {
             const payload = {
                 title: title.trim(),
                 description: description.trim(),
-                startDate: startDate.trim(),
-                endDate: endDate.trim(),
+                startDate: startDate,
+                endDate: endDate,
                 targetAudience: targetAudience.trim() || 'All Customers',
                 bannerUri: bannerUri || null,
                 status: 'RUNNING',
@@ -229,6 +317,7 @@ export default function AdsPromosScreen() {
         setDiscountCode('');
         setDiscountValue('15% OFF');
         setDiscountValidity('');
+        setDiscountExpiryDate('');
         setDiscountStatus('ONGOING');
         setDiscountErrors({});
         setShowDiscountForm(false);
@@ -240,6 +329,13 @@ export default function AdsPromosScreen() {
         setDiscountCode(discount.code || '');
         setDiscountValue(discount.discountValue || '15% OFF');
         setDiscountValidity(discount.validity || '');
+
+        // Try parsing expiry date from validity text
+        const parsed = parseDate(discount.validity?.replace(/^Valid until /i, ''));
+        if (parsed) {
+            setDiscountExpiryDate(toDateString(parsed));
+        }
+
         setDiscountStatus(discount.status || 'ONGOING');
         setDiscountErrors({});
         setShowDiscountForm(true);
@@ -279,7 +375,9 @@ export default function AdsPromosScreen() {
         } else if (discountCode.trim().length < 3) {
             errors.code = 'Promo code must be at least 3 characters.';
         }
-        if (!discountValidity.trim()) errors.validity = 'Validity text or expiry date is required.';
+        if (!discountValidity.trim()) {
+            errors.validity = 'Please select an expiry date from the calendar.';
+        }
 
         setDiscountErrors(errors);
         return Object.keys(errors).length === 0;
@@ -413,9 +511,12 @@ export default function AdsPromosScreen() {
                                                 <Text style={styles.adDesc} numberOfLines={2}>
                                                     {ad.description}
                                                 </Text>
-                                                <Text style={styles.adDates}>
-                                                    {ad.startDate} - {ad.endDate}
-                                                </Text>
+                                                <View style={styles.adDateBadge}>
+                                                    <Ionicons name="calendar-outline" size={12} color="#5C8AF0" style={{ marginRight: 4 }} />
+                                                    <Text style={styles.adDates}>
+                                                        {toFriendlyDateString(ad.startDate)} - {toFriendlyDateString(ad.endDate)}
+                                                    </Text>
+                                                </View>
                                             </View>
                                         </View>
 
@@ -507,21 +608,25 @@ export default function AdsPromosScreen() {
                                     </TouchableOpacity>
                                 )}
 
+                                {/* Calendar Date Pickers for Start and End Dates */}
                                 <View style={styles.twoColRow}>
                                     <View style={styles.col}>
                                         <Text style={styles.label}>
                                             Start Date <Text style={styles.req}>*</Text>
                                         </Text>
-                                        <TextInput
-                                            style={[styles.input, adErrors.startDate && styles.inputError]}
-                                            placeholder="MM/DD/YYYY"
-                                            placeholderTextColor="#A0A0A0"
-                                            value={startDate}
-                                            onChangeText={(t) => {
-                                                setStartDate(t);
-                                                if (adErrors.startDate) setAdErrors((p) => ({ ...p, startDate: null }));
-                                            }}
-                                        />
+                                        <TouchableOpacity
+                                            style={[styles.datePickerBtn, adErrors.startDate && styles.inputError]}
+                                            onPress={openStartDatePicker}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="calendar-outline" size={18} color="#5C8AF0" style={{ marginRight: 6 }} />
+                                            <Text
+                                                style={startDate ? styles.dateTextSelected : styles.dateTextPlaceholder}
+                                                numberOfLines={1}
+                                            >
+                                                {startDate ? toFriendlyDateString(startDate) : 'Pick start date'}
+                                            </Text>
+                                        </TouchableOpacity>
                                         {adErrors.startDate && <Text style={styles.errorText}>{adErrors.startDate}</Text>}
                                     </View>
 
@@ -529,16 +634,19 @@ export default function AdsPromosScreen() {
                                         <Text style={styles.label}>
                                             End Date <Text style={styles.req}>*</Text>
                                         </Text>
-                                        <TextInput
-                                            style={[styles.input, adErrors.endDate && styles.inputError]}
-                                            placeholder="MM/DD/YYYY"
-                                            placeholderTextColor="#A0A0A0"
-                                            value={endDate}
-                                            onChangeText={(t) => {
-                                                setEndDate(t);
-                                                if (adErrors.endDate) setAdErrors((p) => ({ ...p, endDate: null }));
-                                            }}
-                                        />
+                                        <TouchableOpacity
+                                            style={[styles.datePickerBtn, adErrors.endDate && styles.inputError]}
+                                            onPress={openEndDatePicker}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="calendar-outline" size={18} color="#5C8AF0" style={{ marginRight: 6 }} />
+                                            <Text
+                                                style={endDate ? styles.dateTextSelected : styles.dateTextPlaceholder}
+                                                numberOfLines={1}
+                                            >
+                                                {endDate ? toFriendlyDateString(endDate) : 'Pick end date'}
+                                            </Text>
+                                        </TouchableOpacity>
                                         {adErrors.endDate && <Text style={styles.errorText}>{adErrors.endDate}</Text>}
                                     </View>
                                 </View>
@@ -612,9 +720,12 @@ export default function AdsPromosScreen() {
                                                 <Text style={styles.discountValueText}>
                                                     Benefit: {discount.discountValue || 'Discount Applied'}
                                                 </Text>
-                                                <Text style={styles.discountValidityText}>
-                                                    <Ionicons name="calendar-outline" size={12} color="#6B7280" /> {discount.validity}
-                                                </Text>
+                                                <View style={styles.validityBadgeRow}>
+                                                    <Ionicons name="calendar-outline" size={13} color="#6B7280" style={{ marginRight: 4 }} />
+                                                    <Text style={styles.discountValidityText}>
+                                                        {discount.validity}
+                                                    </Text>
+                                                </View>
                                             </View>
                                             <View style={styles.codeBadge}>
                                                 <Text style={styles.codeBadgeText}>{discount.code}</Text>
@@ -708,19 +819,23 @@ export default function AdsPromosScreen() {
                                     </View>
                                 </View>
 
+                                {/* Calendar Date Picker for Discount Validity */}
                                 <Text style={styles.label}>
-                                    Validity / Expiry Details <Text style={styles.req}>*</Text>
+                                    Validity / Expiry Date <Text style={styles.req}>*</Text>
                                 </Text>
-                                <TextInput
-                                    style={[styles.input, discountErrors.validity && styles.inputError]}
-                                    value={discountValidity}
-                                    onChangeText={(t) => {
-                                        setDiscountValidity(t);
-                                        if (discountErrors.validity) setDiscountErrors((p) => ({ ...p, validity: null }));
-                                    }}
-                                    placeholder="e.g. Valid until Nov 30, 2026"
-                                    placeholderTextColor="#A0A0A0"
-                                />
+                                <TouchableOpacity
+                                    style={[styles.datePickerBtn, discountErrors.validity && styles.inputError]}
+                                    onPress={openDiscountDatePicker}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="calendar-outline" size={18} color="#5C8AF0" style={{ marginRight: 8 }} />
+                                    <Text
+                                        style={discountValidity ? styles.dateTextSelected : styles.dateTextPlaceholder}
+                                        numberOfLines={1}
+                                    >
+                                        {discountValidity || 'Select coupon expiry date from calendar...'}
+                                    </Text>
+                                </TouchableOpacity>
                                 {discountErrors.validity && <Text style={styles.errorText}>{discountErrors.validity}</Text>}
 
                                 <Text style={styles.label}>Status</Text>
@@ -756,6 +871,17 @@ export default function AdsPromosScreen() {
                     </>
                 )}
             </ScrollView>
+
+            {/* Calendar Date Picker Modal */}
+            <CalendarDatePickerModal
+                visible={datePickerConfig.visible}
+                onClose={() => setDatePickerConfig((prev) => ({ ...prev, visible: false }))}
+                title={datePickerConfig.title}
+                initialDate={datePickerConfig.initialDate}
+                minDate={datePickerConfig.minDate}
+                maxDate={datePickerConfig.maxDate}
+                onSelectDate={datePickerConfig.onSelect}
+            />
         </SafeAreaView>
     );
 }
@@ -857,10 +983,12 @@ const styles = StyleSheet.create({
     adInfo: { flex: 1, justifyContent: 'center' },
     adTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
     adDesc: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 4 },
-    adDates: { fontSize: 11, color: '#9CA3AF' },
+    adDateBadge: { flexDirection: 'row', alignItems: 'center' },
+    adDates: { fontSize: 11, color: '#5C8AF0', fontWeight: '600' },
 
     discountTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     discountValueText: { fontSize: 13, color: '#10B981', fontWeight: 'bold', marginVertical: 3 },
+    validityBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
     discountValidityText: { fontSize: 12, color: '#6B7280' },
     codeBadge: {
         backgroundColor: '#EDF2FE',
@@ -925,6 +1053,19 @@ const styles = StyleSheet.create({
     },
     inputError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
     errorText: { color: '#EF4444', fontSize: 12, marginTop: 4 },
+
+    datePickerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FE',
+        borderWidth: 1,
+        borderColor: '#EEF2F6',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 48,
+    },
+    dateTextSelected: { fontSize: 13, color: '#111827', fontWeight: '600', flex: 1 },
+    dateTextPlaceholder: { fontSize: 12, color: '#A0A0A0', flex: 1 },
 
     textArea: { height: 80, textAlignVertical: 'top', paddingTop: 10 },
     twoColRow: { flexDirection: 'row', gap: 12 },

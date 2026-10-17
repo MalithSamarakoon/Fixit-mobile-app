@@ -14,7 +14,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { belongsToShop, formatCurrency, formatRevenue, getOrderStatusStyle } from './hardwareShopHelpers';
-import { ensureSeedHardwareOrders } from './hardwareShopOrdersService';
 
 export default function HomeScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
@@ -32,9 +31,6 @@ export default function HomeScreen({ navigation }) {
 
     const loadDashboard = useCallback(async () => {
         try {
-            if (shopOwnerId) {
-                await ensureSeedHardwareOrders(shopOwnerId);
-            }
 
             const [productsSnap, ordersSnap] = await Promise.all([
                 getDocs(collection(db, 'products')),
