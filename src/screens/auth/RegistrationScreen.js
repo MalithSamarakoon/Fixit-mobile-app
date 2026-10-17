@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { auth, db } from '../../config/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons'; // Pre-installed with Expo
+import { Ionicons } from '@expo/vector-icons';
+import {
+    sanitizePhoneNumber,
+    validatePhoneNumber,
+    validateEmail,
+    validateRegistrationPassword,
+    validatePasswordConfirmation,
+    mapFirebaseAuthError,
+} from './authValidation';
 
 export default function RegistrationScreen({ route, navigation }) {
     const selectedRole = route.params?.selectedRole || 'HouseOwner';
@@ -26,87 +34,190 @@ export default function RegistrationScreen({ route, navigation }) {
     const [experience, setExperience] = useState('');
     const [serviceCharges, setServiceCharges] = useState('');
 
-    // Custom Validation Function
-    const validateInputs = () => {
-        console.log("Validating inputs:", { email, mobile, password, confirmPassword });
-        // Regex rules
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const phoneRegex = /^\d{10}$/; // Exactly 10 digits
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState({});
 
-        if (!emailRegex.test(email)) {
-            Alert.alert("Invalid Email", "Please enter a valid email address.");
-            return false;
+    // Handlers with real-time feedback
+    const handleUsernameChange = (text) => {
+        setUsername(text);
+        if (errors.username) {
+            setErrors((prev) => ({ ...prev, username: '' }));
         }
-        if (!phoneRegex.test(mobile)) {
-            Alert.alert("Invalid Phone", "Phone number must be exactly 10 digits.");
-            return false;
+    };
+
+    const handleEmailChange = (text) => {
+        setEmail(text);
+        if (errors.email) {
+            setErrors((prev) => ({ ...prev, email: '' }));
         }
-        if (!passwordRegex.test(password)) {
-            Alert.alert("Weak Password", "Password must be at least 8 characters long, include a capital letter, a simple letter, a number, and a special character.");
-            return false;
+    };
+
+    const handleEmailBlur = () => {
+        if (email.trim().length > 0) {
+            const validation = validateEmail(email);
+            if (!validation.isValid) {
+                setErrors((prev) => ({ ...prev, email: validation.message }));
+            }
         }
-        if (password !== confirmPassword) {
-            Alert.alert("Error", "Passwords do not match!");
-            return false;
+    };
+
+    const handleMobileChange = (text) => {
+        // Enforce numeric only and cap at 10 digits
+        const sanitized = sanitizePhoneNumber(text);
+        setMobile(sanitized);
+
+        if (errors.mobile) {
+            if (sanitized.length === 10) {
+                setErrors((prev) => ({ ...prev, mobile: '' }));
+            } else {
+                setErrors((prev) => ({ ...prev, mobile: 'Phone number must contain exactly 10 digits.' }));
+            }
         }
-        if (selectedRole === 'TradeWorker') {
+    };
+
+    const handleMobileBlur = () => {
+        if (mobile.length > 0 && mobile.length !== 10) {
+            setErrors((prev) => ({ ...prev, mobile: 'Phone number must contain exactly 10 digits.' }));
+        }
+    };
+
+    const handlePasswordChange = (text) => {
+        setPassword(text);
+        if (errors.password) {
+            setErrors((prev) => ({ ...prev, password: '' }));
+        }
+        if (confirmPassword && errors.confirmPassword && text === confirmPassword) {
+            setErrors((prev) => ({ ...prev, confirmPassword: '' }));
+        }
+    };
+
+    const handleConfirmPasswordChange = (text) => {
+        setConfirmPassword(text);
+        if (errors.confirmPassword && text === password) {
+            setErrors((prev) => ({ ...prev, confirmPassword: '' }));
+        }
+    };
+
+    // Form Validation Function
+    const validateInputs = () => {
+        const newErrors = {};
+
+        // Username
+        if (!username.trim()) {
+            newErrors.username = 'Please enter your name.';
+        }
+
+        // Email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) {
+            newErrors.email = emailValidation.message;
+        }
+
+        // Mobile: exactly 10 digits, numeric only, stored as string
+        const phoneValidation = validatePhoneNumber(mobile);
+        if (!phoneValidation.isValid) {
+            newErrors.mobile = phoneValidation.message;
+        }
+
+        // Password
+        const passwordValidation = validateRegistrationPassword(password);
+        if (!passwordValidation.isValid) {
+            newErrors.password = passwordValidation.message;
+        }
+
+        // Confirm Password
+        const confirmValidation = validatePasswordConfirmation(password, confirmPassword);
+        if (!confirmValidation.isValid) {
+            newErrors.confirmPassword = confirmValidation.message;
+        }
+
+        // Conditional role validations
+        if (selectedRole === 'HouseOwner') {
             if (!location.trim()) {
-                Alert.alert("Required", "Please provide your working location/city.");
-                return false;
+                newErrors.location = 'Please provide your default location / city.';
+            }
+        } else if (selectedRole === 'HardwareShop') {
+            if (!location.trim()) {
+                newErrors.location = 'Please provide your shop location / city.';
+            }
+        } else if (selectedRole === 'TradeWorker') {
+            if (!location.trim()) {
+                newErrors.location = 'Please provide your working location / city.';
             }
             if (serviceType === 'Other' && !otherServiceType.trim()) {
-                Alert.alert("Required", "Please specify what type of worker you are.");
-                return false;
+                newErrors.otherServiceType = 'Please specify your trade type.';
+            }
+            if (experience && (isNaN(experience) || Number(experience) < 0)) {
+                newErrors.experience = 'Experience must be a valid number of years.';
+            }
+            if (serviceCharges && (isNaN(serviceCharges) || Number(serviceCharges) < 0)) {
+                newErrors.serviceCharges = 'Service charges must be a valid numeric amount.';
             }
         }
-        return true; // All good!
+
+        setErrors(newErrors);
+        return {
+            isValid: Object.keys(newErrors).length === 0,
+            sanitizedEmail: emailValidation.sanitized,
+            sanitizedMobile: sanitizePhoneNumber(mobile),
+        };
     };
 
     const handleRegister = async () => {
-        console.log("=== Register button clicked! ===");
-        if (!validateInputs()) return; // Stop if validations fail
+        Keyboard.dismiss();
+        const { isValid, sanitizedEmail, sanitizedMobile } = validateInputs();
+
+        if (!isValid) {
+            Alert.alert("Validation Error", "Please correct the highlighted errors before submitting.");
+            return;
+        }
+
+        setLoading(true);
 
         try {
-            console.log("Attempting Firebase createUserWithEmailAndPassword...");
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, sanitizedEmail, password);
             const uid = userCredential.user.uid;
-            console.log("Firebase user created with UID:", uid);
 
             const finalRole = serviceType === 'Other' ? otherServiceType.trim() : serviceType;
 
-            let userData = {
+            const userData = {
                 uid,
                 role: selectedRole,
-                username,
-                name: username, // Standardized for both user & agency screens
-                email,
-                mobile,
-                phone: mobile,   // Standardized phone key
+                username: username.trim(),
+                name: username.trim(),
+                email: sanitizedEmail,
+                mobile: sanitizedMobile,
+                phone: sanitizedMobile,
                 createdAt: new Date(),
             };
 
             if (selectedRole === 'HouseOwner' || selectedRole === 'HardwareShop') {
-                userData.location = location;
+                userData.location = location.trim();
             } else if (selectedRole === 'TradeWorker') {
-                userData.location = location;
+                userData.location = location.trim();
                 userData.serviceType = finalRole;
-                userData.trade = finalRole; // Standardized trade key
-                userData.experience = experience;
-                userData.serviceCharges = serviceCharges;
-                userData.status = 'Available'; // Default status (Requirement ix)
+                userData.trade = finalRole;
+                userData.experience = experience.trim();
+                userData.serviceCharges = serviceCharges.trim();
+                userData.status = 'Available';
                 userData.rating = 5.0;
+            } else if (selectedRole === 'ServiceAgency') {
+                if (location.trim()) {
+                    userData.location = location.trim();
+                    userData.address = location.trim();
+                }
             }
-            console.log("Saving user profile to Firestore users collection...");
 
             await setDoc(doc(db, 'users', uid), userData);
-            console.log("User successfully saved to Firestore!");
 
-            Alert.alert("Success", "Account created successfully!");
-            navigation.navigate('Login');
+            Alert.alert("Success", "Account created successfully! Please log in.", [
+                { text: "OK", onPress: () => navigation.navigate('Login') }
+            ]);
         } catch (error) {
-            console.error("Registration error encountered:", error);
-            Alert.alert("Registration Error", error.message);
+            const friendlyMessage = mapFirebaseAuthError(error);
+            Alert.alert("Registration Failed", friendlyMessage);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -117,7 +228,23 @@ export default function RegistrationScreen({ route, navigation }) {
                 return (
                     <>
                         <Text style={styles.label}>{selectedRole === 'HouseOwner' ? 'Default Location' : 'Shop Location'}</Text>
-                        <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="e.g. Colombo 03" placeholderTextColor="#A0A0A0" />
+                        <TextInput
+                            style={[styles.input, errors.location && styles.inputError]}
+                            value={location}
+                            onChangeText={(val) => {
+                                setLocation(val);
+                                if (errors.location) setErrors((prev) => ({ ...prev, location: '' }));
+                            }}
+                            placeholder="e.g. Colombo 03"
+                            placeholderTextColor="#A0A0A0"
+                            editable={!loading}
+                        />
+                        {errors.location ? (
+                            <View style={styles.errorContainer}>
+                                <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                                <Text style={styles.errorText}>{errors.location}</Text>
+                            </View>
+                        ) : null}
                     </>
                 );
             case 'TradeWorker':
@@ -126,12 +253,22 @@ export default function RegistrationScreen({ route, navigation }) {
                         {/* Location field */}
                         <Text style={styles.label}>Working Location / City</Text>
                         <TextInput 
-                            style={styles.input} 
+                            style={[styles.input, errors.location && styles.inputError]} 
                             value={location} 
-                            onChangeText={setLocation} 
+                            onChangeText={(val) => {
+                                setLocation(val);
+                                if (errors.location) setErrors((prev) => ({ ...prev, location: '' }));
+                            }}
                             placeholder="e.g. Colombo 07, Dehiwala" 
                             placeholderTextColor="#A0A0A0" 
+                            editable={!loading}
                         />
+                        {errors.location ? (
+                            <View style={styles.errorContainer}>
+                                <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                                <Text style={styles.errorText}>{errors.location}</Text>
+                            </View>
+                        ) : null}
 
                         {/* Role Dropdown */}
                         <Text style={styles.label}>Role / Trade Type</Text>
@@ -139,6 +276,7 @@ export default function RegistrationScreen({ route, navigation }) {
                             style={styles.dropdownSelector} 
                             onPress={() => setShowRoleDropdown(!showRoleDropdown)}
                             activeOpacity={0.8}
+                            disabled={loading}
                         >
                             <Text style={styles.dropdownSelectorText}>{serviceType}</Text>
                             <Ionicons name={showRoleDropdown ? "chevron-up" : "chevron-down"} size={20} color="#5B84F2" />
@@ -177,20 +315,64 @@ export default function RegistrationScreen({ route, navigation }) {
                             <>
                                 <Text style={styles.label}>Specify Your Trade</Text>
                                 <TextInput 
-                                    style={styles.input} 
+                                    style={[styles.input, errors.otherServiceType && styles.inputError]} 
                                     value={otherServiceType} 
-                                    onChangeText={setOtherServiceType} 
+                                    onChangeText={(val) => {
+                                        setOtherServiceType(val);
+                                        if (errors.otherServiceType) setErrors((prev) => ({ ...prev, otherServiceType: '' }));
+                                    }} 
                                     placeholder="e.g. Carpenter, Welder, AC Repair" 
                                     placeholderTextColor="#A0A0A0" 
+                                    editable={!loading}
                                 />
+                                {errors.otherServiceType ? (
+                                    <View style={styles.errorContainer}>
+                                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                                        <Text style={styles.errorText}>{errors.otherServiceType}</Text>
+                                    </View>
+                                ) : null}
                             </>
                         )}
 
                         <Text style={styles.label}>Experience (Years)</Text>
-                        <TextInput style={styles.input} value={experience} onChangeText={setExperience} keyboardType="numeric" placeholder="e.g. 5" placeholderTextColor="#A0A0A0" />
+                        <TextInput
+                            style={[styles.input, errors.experience && styles.inputError]}
+                            value={experience}
+                            onChangeText={(val) => {
+                                setExperience(val.replace(/\D/g, ''));
+                                if (errors.experience) setErrors((prev) => ({ ...prev, experience: '' }));
+                            }}
+                            keyboardType="numeric"
+                            placeholder="e.g. 5"
+                            placeholderTextColor="#A0A0A0"
+                            editable={!loading}
+                        />
+                        {errors.experience ? (
+                            <View style={styles.errorContainer}>
+                                <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                                <Text style={styles.errorText}>{errors.experience}</Text>
+                            </View>
+                        ) : null}
 
                         <Text style={styles.label}>Service Charges (LKR/hr)</Text>
-                        <TextInput style={styles.input} value={serviceCharges} onChangeText={setServiceCharges} keyboardType="numeric" placeholder="e.g. 1500" placeholderTextColor="#A0A0A0" />
+                        <TextInput
+                            style={[styles.input, errors.serviceCharges && styles.inputError]}
+                            value={serviceCharges}
+                            onChangeText={(val) => {
+                                setServiceCharges(val.replace(/\D/g, ''));
+                                if (errors.serviceCharges) setErrors((prev) => ({ ...prev, serviceCharges: '' }));
+                            }}
+                            keyboardType="numeric"
+                            placeholder="e.g. 1500"
+                            placeholderTextColor="#A0A0A0"
+                            editable={!loading}
+                        />
+                        {errors.serviceCharges ? (
+                            <View style={styles.errorContainer}>
+                                <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                                <Text style={styles.errorText}>{errors.serviceCharges}</Text>
+                            </View>
+                        ) : null}
                     </>
                 );
             default:
@@ -205,49 +387,130 @@ export default function RegistrationScreen({ route, navigation }) {
                 <Text style={styles.subtitle}>as {selectedRole}</Text>
 
                 <Text style={styles.label}>Username / Name</Text>
-                <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor="#A0A0A0" />
+                <TextInput
+                    style={[styles.input, errors.username && styles.inputError]}
+                    value={username}
+                    onChangeText={handleUsernameChange}
+                    placeholderTextColor="#A0A0A0"
+                    editable={!loading}
+                />
+                {errors.username ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                        <Text style={styles.errorText}>{errors.username}</Text>
+                    </View>
+                ) : null}
 
                 <Text style={styles.label}>Email Address</Text>
-                <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#A0A0A0" />
+                <TextInput
+                    style={[styles.input, errors.email && styles.inputError]}
+                    value={email}
+                    onChangeText={handleEmailChange}
+                    onBlur={handleEmailBlur}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder="e.g. user@example.com"
+                    placeholderTextColor="#A0A0A0"
+                    editable={!loading}
+                />
+                {errors.email ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                        <Text style={styles.errorText}>{errors.email}</Text>
+                    </View>
+                ) : null}
 
                 <Text style={styles.label}>Mobile Number</Text>
-                <TextInput style={styles.input} value={mobile} onChangeText={setMobile} keyboardType="phone-pad" placeholderTextColor="#A0A0A0" />
+                <TextInput
+                    style={[styles.input, errors.mobile && styles.inputError]}
+                    value={mobile}
+                    onChangeText={handleMobileChange}
+                    onBlur={handleMobileBlur}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    placeholder="10 digit phone number"
+                    placeholderTextColor="#A0A0A0"
+                    editable={!loading}
+                />
+                {errors.mobile ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                        <Text style={styles.errorText}>{errors.mobile}</Text>
+                    </View>
+                ) : null}
 
                 <Text style={styles.label}>Password</Text>
-                <View style={styles.passwordContainer}>
+                <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
                     <TextInput
                         style={styles.passwordInput}
                         value={password}
-                        onChangeText={setPassword}
+                        onChangeText={handlePasswordChange}
                         secureTextEntry={!showPassword}
                         placeholderTextColor="#A0A0A0"
+                        editable={!loading}
                     />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#888" />
                     </TouchableOpacity>
                 </View>
+                <Text style={styles.helperText}>
+                    Must be at least 8 characters with uppercase, lowercase, number, and special character.
+                </Text>
+                {errors.password ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                        <Text style={styles.errorText}>{errors.password}</Text>
+                    </View>
+                ) : null}
 
                 <Text style={styles.label}>Confirm Password</Text>
-                <View style={styles.passwordContainer}>
+                <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
                     <TextInput
                         style={styles.passwordInput}
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
+                        onChangeText={handleConfirmPasswordChange}
                         secureTextEntry={!showConfirmPassword}
                         placeholderTextColor="#A0A0A0"
+                        editable={!loading}
                     />
-                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                    <TouchableOpacity
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#888" />
                     </TouchableOpacity>
                 </View>
+                {errors.confirmPassword ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={14} color="#FFE4E4" />
+                        <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                    </View>
+                ) : null}
 
                 {renderConditionalFields()}
 
-                <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-                    <Text style={styles.registerButtonText}>Register</Text>
+                <TouchableOpacity
+                    style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+                    onPress={handleRegister}
+                    disabled={loading}
+                    activeOpacity={0.8}
+                >
+                    {loading ? (
+                        <ActivityIndicator size="small" color="#5B84F2" />
+                    ) : (
+                        <Text style={styles.registerButtonText}>Register</Text>
+                    )}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
+                <TouchableOpacity
+                    style={styles.linkButton}
+                    onPress={() => navigation.navigate('Login')}
+                    disabled={loading}
+                >
                     <Text style={styles.linkButtonText}>Already have an account? Login</Text>
                 </TouchableOpacity>
             </View>
@@ -261,7 +524,41 @@ const styles = StyleSheet.create({
     title: { color: '#fff', fontSize: 24, fontWeight: '600', textAlign: 'center' },
     subtitle: { color: '#e0e0e0', fontSize: 14, marginBottom: 20, textAlign: 'center' },
     label: { color: '#fff', fontSize: 14, marginBottom: 5, marginLeft: 10 },
-    input: { backgroundColor: '#fff', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 15, fontSize: 14 },
+    input: {
+        backgroundColor: '#fff',
+        borderRadius: 25,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        marginBottom: 15,
+        fontSize: 14,
+        color: '#1E2022',
+    },
+    inputError: {
+        borderColor: '#FFB8B8',
+        borderWidth: 2,
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: -10,
+        marginBottom: 12,
+        marginLeft: 10,
+        gap: 5,
+    },
+    errorText: {
+        color: '#FFE4E4',
+        fontSize: 12,
+        fontWeight: '600',
+        flexShrink: 1,
+    },
+    helperText: {
+        color: '#E2E8F0',
+        fontSize: 11,
+        marginTop: -10,
+        marginBottom: 10,
+        marginLeft: 10,
+        lineHeight: 14,
+    },
     passwordContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -269,9 +566,9 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         paddingHorizontal: 15,
         marginBottom: 15,
-        height: 45 // Fixed height helps container hold the icon nicely
+        height: 45,
     },
-    passwordInput: { flex: 1, fontSize: 14, height: '100%' },
+    passwordInput: { flex: 1, fontSize: 14, height: '100%', color: '#1E2022' },
     dropdownSelector: {
         backgroundColor: '#fff',
         borderRadius: 25,
@@ -303,7 +600,18 @@ const styles = StyleSheet.create({
     dropdownItemSelected: { backgroundColor: '#EDF2FE' },
     dropdownItemText: { fontSize: 14, color: '#4B5563' },
     dropdownItemTextSelected: { color: '#5B84F2', fontWeight: 'bold' },
-    registerButton: { backgroundColor: '#fff', borderRadius: 25, paddingVertical: 12, alignItems: 'center', marginTop: 15 },
+    registerButton: {
+        backgroundColor: '#fff',
+        borderRadius: 25,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginTop: 15,
+        height: 45,
+        justifyContent: 'center',
+    },
+    registerButtonDisabled: {
+        opacity: 0.85,
+    },
     registerButtonText: { color: '#5B84F2', fontSize: 16, fontWeight: 'bold' },
     linkButton: { marginTop: 20, alignItems: 'center' },
     linkButtonText: { color: '#fff', fontSize: 13, textDecorationLine: 'underline' }
