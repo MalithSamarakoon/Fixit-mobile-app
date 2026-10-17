@@ -47,26 +47,74 @@ export const getStockBadge = (stock) => {
     return { label: `In Stock (${num})`, color: '#10B981', bg: '#ECFDF5', isLow: false, isOut: false };
 };
 
-/** Validation Helpers */
+/**
+ * Phone Number Validation Constants & Helpers
+ * Rule: Accept numbers only, exactly 10 digits, preserve leading zeros.
+ */
+export const PHONE_VALIDATION_ERROR = 'Phone number must contain exactly 10 digits.';
+
 export const validatePhone = (phone) => {
-    if (!phone) return false;
-    const cleaned = String(phone).replace(/[\s-]/g, '');
-    return /^(?:0|94|\+94)?\d{9,10}$/.test(cleaned);
+    if (typeof phone !== 'string') return false;
+    // Exactly 10 numeric digits, no spaces, letters, or symbols
+    return /^\d{10}$/.test(phone);
 };
 
+export const sanitizePhoneNumber = (val) => {
+    if (!val) return '';
+    // Strip non-digits and prevent exceeding 10 digits
+    return String(val).replace(/\D/g, '').slice(0, 10);
+};
+
+/** Email Validation */
 export const validateEmail = (email) => {
     if (!email) return false;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
 };
 
+/** Positive Number Validation */
 export const validatePositiveNumber = (val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
 };
 
+/** Non-negative Integer Validation */
 export const validateNonNegativeInteger = (val) => {
     const num = Number(val);
     return !isNaN(num) && Number.isInteger(num) && num >= 0;
+};
+
+/** Date Validation Helpers */
+export const parseDateAtMidnight = (dateInput) => {
+    if (!dateInput) return null;
+    if (dateInput instanceof Date) {
+        return new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
+    }
+    if (typeof dateInput === 'string') {
+        const parts = dateInput.split('-');
+        if (parts.length === 3) {
+            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
+        const parsed = new Date(dateInput);
+        if (!isNaN(parsed.getTime())) {
+            return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+        }
+    }
+    return null;
+};
+
+export const isDateBefore = (dateA, dateB) => {
+    const da = parseDateAtMidnight(dateA);
+    const db = parseDateAtMidnight(dateB);
+    if (!da || !db) return false;
+    return da.getTime() < db.getTime();
+};
+
+export const isDatePast = (dateVal) => {
+    const target = parseDateAtMidnight(dateVal);
+    if (!target) return false;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return target.getTime() < today.getTime();
 };
 
 /** Products/ads owned by this shop or legacy docs without shopOwnerId */
